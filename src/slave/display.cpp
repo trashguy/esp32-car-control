@@ -1,5 +1,5 @@
 #include "display.h"
-#include "i2c_slave.h"
+#include "slave/spi_slave.h"
 #include "sd_card.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
@@ -29,6 +29,7 @@ static bool touchInitialized = false;
 
 static DisplayState currentState = DISPLAY_NO_SIGNAL;
 static uint16_t displayedRpm = 0;
+static uint16_t manualRpm = 3000;  // Adjustable RPM for manual mode
 static bool needsFullRedraw = true;
 static unsigned long lastBlinkTime = 0;
 static bool blinkState = false;
@@ -96,6 +97,12 @@ static bool blinkState = false;
 #define WIFI_BTN_X          8
 #define WIFI_BTN_Y          (SCREEN_HEIGHT - WIFI_BTN_SIZE - 8)
 
+// RPM up/down buttons layout (manual mode only, positioned beside RPM value)
+#define RPM_BTN_SIZE        40
+#define RPM_BTN_Y           (RPM_Y_POS - RPM_BTN_SIZE / 2)  // Vertically centered with RPM
+#define RPM_UP_BTN_X        20                               // Left of RPM number
+#define RPM_DOWN_BTN_X      (SCREEN_WIDTH - RPM_BTN_SIZE - 20) // Right of RPM number
+
 // WiFi screen layout (scrollable content area)
 #define WIFI_CONTENT_Y      40
 #define WIFI_CONTENT_H      (SCREEN_HEIGHT - WIFI_CONTENT_Y - 10)
@@ -137,7 +144,10 @@ static bool wifiModeButtonPressed = false;
 static bool wifiBackButtonPressed = false;
 static bool wifiScanButtonPressed = false;
 static bool modeButtonPressed = false;
+static bool rpmUpButtonPressed = false;
+static bool rpmDownButtonPressed = false;
 static bool lastTouchState = false;
+static bool lastSyncState = false;
 
 // File browser state
 static char* fileList[MAX_FILES];
@@ -197,6 +207,8 @@ static const char* kbRowSymbols3 = ";:'\",.?/";
 static void switchToScreen(ScreenType screen);
 static void drawWifiScanButton(bool pressed);
 static void drawModeButton(bool pressed);
+static void drawRpmUpButton(bool pressed);
+static void drawRpmDownButton(bool pressed);
 
 static void drawBackground() {
     tft.fillScreen(COLOR_BACKGROUND);
@@ -232,6 +244,36 @@ static void drawRpmValue(uint16_t rpm, bool connected) {
         snprintf(rpmStr, sizeof(rpmStr), "%u", rpm);
         tft.drawString(rpmStr, SCREEN_WIDTH / 2, RPM_Y_POS);
     }
+
+    // Draw up/down buttons if in manual mode and connected
+    if (spiSlaveGetMasterMode() == MODE_MANUAL && connected) {
+        drawRpmUpButton(rpmUpButtonPressed);
+        drawRpmDownButton(rpmDownButtonPressed);
+    }
+}
+
+// Check if master and slave are in sync (master has acknowledged our requests)
+static bool isSynced() {
+    if (!spiSlaveIsConnected()) return false;
+
+    // Check if master's state matches our requested state
+    uint8_t masterMode = spiSlaveGetMasterMode();
+    uint8_t requestedMode = spiSlaveGetRequestedMode();
+
+    if (masterMode != requestedMode) {
+        // Mode mismatch - waiting for master to adopt our mode request
+        return false;
+    }
+
+    if (masterMode == MODE_MANUAL) {
+        // In manual mode, also check if RPM matches
+        uint16_t masterRpm = spiSlaveGetLastRpm();
+        uint16_t requestedRpm = spiSlaveGetRequestedRpm();
+        return masterRpm == requestedRpm;
+    }
+
+    // In auto mode, synced if mode matches
+    return true;
 }
 
 static void drawStatusIndicator(bool connected) {
@@ -242,9 +284,17 @@ static void drawStatusIndicator(bool connected) {
     tft.setTextSize(1);
 
     if (connected) {
-        tft.setTextColor(COLOR_CONNECTED, COLOR_BACKGROUND);
-        tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, COLOR_CONNECTED);
-        tft.drawString("CONNECTED", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
+        bool synced = isSynced();
+        if (synced) {
+            tft.setTextColor(COLOR_CONNECTED, COLOR_BACKGROUND);
+            tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, COLOR_CONNECTED);
+            tft.drawString("SYNCED", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
+        } else {
+            // Connected but not yet synced (waiting for master to adopt manual RPM)
+            tft.setTextColor(COLOR_WARNING, COLOR_BACKGROUND);
+            tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, COLOR_WARNING);
+            tft.drawString("SYNCING", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
+        }
     } else {
         // Blink the disconnected indicator
         uint16_t indicatorColor = blinkState ? COLOR_DISCONNECTED : COLOR_BACKGROUND;
@@ -330,7 +380,7 @@ static void drawGearButton(bool pressed) {
 
 static void drawModeButton(bool pressed) {
     uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
-    uint8_t mode = i2cGetMode();
+    uint8_t mode = spiSlaveGetRequestedMode();  // Display the mode user has requested
 
     // Draw button background
     tft.fillRoundRect(MODE_BTN_X, MODE_BTN_Y, MODE_BTN_SIZE, MODE_BTN_SIZE, 6, btnColor);
@@ -346,6 +396,54 @@ static void drawModeButton(bool pressed) {
 static bool isTouchInModeButton(int16_t x, int16_t y) {
     return (x >= MODE_BTN_X && x <= MODE_BTN_X + MODE_BTN_SIZE &&
             y >= MODE_BTN_Y && y <= MODE_BTN_Y + MODE_BTN_SIZE);
+}
+
+static bool isTouchInRpmUpButton(int16_t x, int16_t y) {
+    return (x >= RPM_UP_BTN_X && x <= RPM_UP_BTN_X + RPM_BTN_SIZE &&
+            y >= RPM_BTN_Y && y <= RPM_BTN_Y + RPM_BTN_SIZE);
+}
+
+static bool isTouchInRpmDownButton(int16_t x, int16_t y) {
+    return (x >= RPM_DOWN_BTN_X && x <= RPM_DOWN_BTN_X + RPM_BTN_SIZE &&
+            y >= RPM_BTN_Y && y <= RPM_BTN_Y + RPM_BTN_SIZE);
+}
+
+static void drawRpmUpButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    int16_t cx = RPM_UP_BTN_X + RPM_BTN_SIZE / 2;
+    int16_t cy = RPM_BTN_Y + RPM_BTN_SIZE / 2;
+
+    // Draw button background
+    tft.fillRoundRect(RPM_UP_BTN_X, RPM_BTN_Y, RPM_BTN_SIZE, RPM_BTN_SIZE, 6, btnColor);
+    tft.drawRoundRect(RPM_UP_BTN_X, RPM_BTN_Y, RPM_BTN_SIZE, RPM_BTN_SIZE, 6, COLOR_BTN_TEXT);
+
+    // Draw up arrow triangle
+    int16_t arrowSize = 12;
+    tft.fillTriangle(
+        cx, cy - arrowSize,                    // Top point
+        cx - arrowSize, cy + arrowSize / 2,    // Bottom left
+        cx + arrowSize, cy + arrowSize / 2,    // Bottom right
+        COLOR_BTN_TEXT
+    );
+}
+
+static void drawRpmDownButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    int16_t cx = RPM_DOWN_BTN_X + RPM_BTN_SIZE / 2;
+    int16_t cy = RPM_BTN_Y + RPM_BTN_SIZE / 2;
+
+    // Draw button background
+    tft.fillRoundRect(RPM_DOWN_BTN_X, RPM_BTN_Y, RPM_BTN_SIZE, RPM_BTN_SIZE, 6, btnColor);
+    tft.drawRoundRect(RPM_DOWN_BTN_X, RPM_BTN_Y, RPM_BTN_SIZE, RPM_BTN_SIZE, 6, COLOR_BTN_TEXT);
+
+    // Draw down arrow triangle
+    int16_t arrowSize = 12;
+    tft.fillTriangle(
+        cx, cy + arrowSize,                    // Bottom point
+        cx - arrowSize, cy - arrowSize / 2,    // Top left
+        cx + arrowSize, cy - arrowSize / 2,    // Top right
+        COLOR_BTN_TEXT
+    );
 }
 
 static void drawBackButton(bool pressed) {
@@ -568,6 +666,13 @@ static void loadWifiSettings() {
     strncpy(wifiSsid, ssid.c_str(), MAX_SSID_LEN);
     strncpy(wifiPassword, pass.c_str(), MAX_PASS_LEN);
     prefs.end();
+}
+
+// Initialize requested RPM state (master is source of truth, we just send requests)
+static void initRequestedRpm() {
+    manualRpm = 3000;  // Default starting value for UI
+    spiSlaveSetRequestedRpm(manualRpm);
+    spiSlaveSetRequestedMode(MODE_AUTO);  // Start in auto mode
 }
 
 static const char* getWifiModeString() {
@@ -1213,20 +1318,20 @@ static void drawDiagnosticsContent() {
         baseY += 8; \
     } while(0)
 
-    // I2C Status
-    DRAW_LINE("I2C Status:", i2cIsConnected() ? "Connected" : "Disconnected",
-              i2cIsConnected() ? COLOR_CONNECTED : COLOR_DISCONNECTED);
+    // SPI Status
+    DRAW_LINE("SPI Status:", spiSlaveIsConnected() ? "Connected" : "Disconnected",
+              spiSlaveIsConnected() ? COLOR_CONNECTED : COLOR_DISCONNECTED);
 
     // Valid packets
-    snprintf(buf, sizeof(buf), "%lu", i2cGetValidPacketCount());
+    snprintf(buf, sizeof(buf), "%lu", spiSlaveGetValidPacketCount());
     DRAW_LINE("Valid Packets:", buf, COLOR_RPM_TEXT);
 
     // Invalid packets
-    snprintf(buf, sizeof(buf), "%lu", i2cGetInvalidPacketCount());
+    snprintf(buf, sizeof(buf), "%lu", spiSlaveGetInvalidPacketCount());
     DRAW_LINE("Invalid Packets:", buf, COLOR_RPM_TEXT);
 
     // Last RPM
-    snprintf(buf, sizeof(buf), "%u", i2cGetLastRpm());
+    snprintf(buf, sizeof(buf), "%u", spiSlaveGetLastRpm());
     DRAW_LINE("Last RPM:", buf, COLOR_RPM_TEXT);
 
     baseY += 5;
@@ -1371,8 +1476,9 @@ bool displayInit() {
     digitalWrite(TOUCH_RST_PIN, HIGH);
     delay(300);  // Wait for touch controller to boot
 
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_FREQUENCY);  // Fast mode (400kHz)
+    // Wire (I2C0) is dedicated to touch controller on GPIO 16/15
+    Wire.begin(I2C_TOUCH_SDA_PIN, I2C_TOUCH_SCL_PIN);
+    Wire.setClock(I2C_FREQUENCY);
 
     // Check if FT6336G is present by reading chip ID
     Wire.beginTransmission((uint8_t)FT6336G_ADDR);
@@ -1403,6 +1509,10 @@ bool displayInit() {
     loadWifiSettings();
     Serial.printf("WiFi mode loaded: %s\n", getWifiModeString());
 
+    // Initialize requested state (master is source of truth)
+    initRequestedRpm();
+    Serial.println("Slave initialized - master is source of truth");
+
     // Initialize WiFi based on saved mode
     if (wifiMode == 0) {
         WiFi.mode(WIFI_OFF);
@@ -1422,23 +1532,20 @@ bool displayInit() {
     drawModeButton(false);
     needsFullRedraw = false;
 
-    // Switch to slave mode for RPM reception
-    i2cEnableSlaveMode();
-    Serial.println("I2C switched to slave mode for RPM reception");
+    // Note: SPI slave for RPM is initialized separately in spiSlaveInit()
+    Serial.println("Touch controller uses Wire (I2C0), RPM slave uses SPI");
 
     return true;
 }
 
 void displayUpdateRpm(uint16_t rpm) {
-    // In manual mode, always show 3000 RPM
-    uint16_t displayRpm = (i2cGetMode() == MODE_MANUAL) ? 3000 : rpm;
-
-    if (displayRpm != displayedRpm || currentState != DISPLAY_CONNECTED) {
-        displayedRpm = displayRpm;
+    // Master is source of truth - display whatever it sends
+    if (rpm != displayedRpm || currentState != DISPLAY_CONNECTED) {
+        displayedRpm = rpm;
         currentState = DISPLAY_CONNECTED;
         // Only update display if on main screen
         if (currentScreen == SCREEN_MAIN) {
-            drawRpmValue(displayRpm, true);
+            drawRpmValue(rpm, true);
             drawStatusIndicator(true);
         }
     }
@@ -1446,9 +1553,14 @@ void displayUpdateRpm(uint16_t rpm) {
 
 void displaySetConnected(bool connected) {
     DisplayState newState = connected ? DISPLAY_CONNECTED : DISPLAY_NO_SIGNAL;
+    bool currentSyncState = connected ? isSynced() : false;
 
-    if (newState != currentState) {
+    bool stateChanged = (newState != currentState);
+    bool syncChanged = (currentSyncState != lastSyncState);
+
+    if (stateChanged || syncChanged) {
         currentState = newState;
+        lastSyncState = currentSyncState;
         // Only update display if on main screen
         if (currentScreen == SCREEN_MAIN) {
             if (!connected) {
@@ -1464,30 +1576,19 @@ static uint8_t touchFailCount = 0;
 bool displayGetTouch(int16_t* x, int16_t* y) {
     if (!touchInitialized) return false;
 
-    // Switch to master mode to read touch
-    i2cEnableMasterMode();
+    // Wire is dedicated to touch controller - no mode switching needed
 
     // Read touch data starting from register 0x02 (status)
     Wire.beginTransmission((uint8_t)FT6336G_ADDR);
     Wire.write(FT6336G_REG_STATUS);
     if (Wire.endTransmission() != 0) {
         touchFailCount++;
-        if (touchFailCount > 20) {
-            i2cRecoverBus();
-            touchFailCount = 0;
-        }
-        i2cEnableSlaveMode();
         return false;
     }
 
     Wire.requestFrom((uint8_t)FT6336G_ADDR, (uint8_t)5);  // Status + XH, XL, YH, YL
     if (Wire.available() < 5) {
         touchFailCount++;
-        if (touchFailCount > 20) {
-            i2cRecoverBus();
-            touchFailCount = 0;
-        }
-        i2cEnableSlaveMode();
         return false;
     }
 
@@ -1497,7 +1598,6 @@ bool displayGetTouch(int16_t* x, int16_t* y) {
     uint8_t touches = status & 0x0F;
 
     if (touches == 0 || touches > 2) {
-        i2cEnableSlaveMode();
         return false;
     }
 
@@ -1505,9 +1605,6 @@ bool displayGetTouch(int16_t* x, int16_t* y) {
     uint8_t xl = Wire.read();
     uint8_t yh = Wire.read();
     uint8_t yl = Wire.read();
-
-    // Switch back to slave mode
-    i2cEnableSlaveMode();
 
     // Extract 12-bit coordinates
     int16_t rawX = ((xh & 0x0F) << 8) | xl;
@@ -1521,8 +1618,6 @@ bool displayGetTouch(int16_t* x, int16_t* y) {
     return true;
 }
 
-static unsigned long lastI2cRecoveryAttempt = 0;
-
 void displayLoop() {
     // Check WiFi status periodically and update indicator if changed
     if (!keyboardVisible && millis() - lastWifiStatusCheck > 1000) {
@@ -1532,12 +1627,6 @@ void displayLoop() {
             lastWifiConnected = currentWifiConnected;
             drawWifiStatusIndicator();
         }
-    }
-
-    // If disconnected for more than 3 seconds, try I2C bus recovery periodically
-    if (!i2cIsConnected() && millis() - lastI2cRecoveryAttempt > 3000) {
-        lastI2cRecoveryAttempt = millis();
-        i2cRecoverBus();
     }
 
     // Handle touch input
@@ -1568,6 +1657,19 @@ void displayLoop() {
                 drawModeButton(true);
                 Serial.println("MODE button pressed");
             }
+            // Check RPM up/down buttons (only in manual mode)
+            if (spiSlaveGetMasterMode() == MODE_MANUAL && currentState == DISPLAY_CONNECTED) {
+                if (isTouchInRpmUpButton(touchX, touchY) && !rpmUpButtonPressed) {
+                    rpmUpButtonPressed = true;
+                    drawRpmUpButton(true);
+                    Serial.println("RPM UP button pressed");
+                }
+                if (isTouchInRpmDownButton(touchX, touchY) && !rpmDownButtonPressed) {
+                    rpmDownButtonPressed = true;
+                    drawRpmDownButton(true);
+                    Serial.println("RPM DOWN button pressed");
+                }
+            }
         } else {
             if (gearButtonPressed) {
                 gearButtonPressed = false;
@@ -1577,12 +1679,41 @@ void displayLoop() {
             }
             if (modeButtonPressed) {
                 modeButtonPressed = false;
-                // Toggle mode between Auto and Manual
-                uint8_t currentMode = i2cGetMode();
+                // Request mode toggle - master will decide and persist
+                uint8_t currentMode = spiSlaveGetRequestedMode();
                 uint8_t newMode = (currentMode == MODE_AUTO) ? MODE_MANUAL : MODE_AUTO;
-                i2cSetMode(newMode);
+                spiSlaveSetRequestedMode(newMode);
                 drawModeButton(false);
-                Serial.printf("Mode changed to %s\n", newMode == MODE_AUTO ? "AUTO" : "MANUAL");
+                // Redraw RPM area to show/hide buttons
+                drawRpmValue(displayedRpm, currentState == DISPLAY_CONNECTED);
+                Serial.printf("Requested mode change to %s\n", newMode == MODE_AUTO ? "AUTO" : "MANUAL");
+            }
+            // Handle RPM button releases
+            if (rpmUpButtonPressed) {
+                rpmUpButtonPressed = false;
+                // Request RPM increase - master will decide and persist
+                uint16_t currentRpm = spiSlaveGetRequestedRpm();
+                if (currentRpm < 5000) {
+                    uint16_t newRpm = currentRpm + 100;
+                    manualRpm = newRpm;  // Update local for display
+                    spiSlaveSetRequestedRpm(newRpm);
+                    Serial.printf("Requested RPM increase to %u\n", newRpm);
+                } else {
+                    drawRpmUpButton(false);
+                }
+            }
+            if (rpmDownButtonPressed) {
+                rpmDownButtonPressed = false;
+                // Request RPM decrease - master will decide and persist
+                uint16_t currentRpm = spiSlaveGetRequestedRpm();
+                if (currentRpm > 500) {
+                    uint16_t newRpm = currentRpm - 100;
+                    manualRpm = newRpm;  // Update local for display
+                    spiSlaveSetRequestedRpm(newRpm);
+                    Serial.printf("Requested RPM decrease to %u\n", newRpm);
+                } else {
+                    drawRpmDownButton(false);
+                }
             }
         }
 

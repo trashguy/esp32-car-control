@@ -4,48 +4,98 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// I2C Protocol Constants
-#define RPM_PACKET_HEADER 0xAA
-#define RPM_PACKET_SIZE 4
+// SPI Protocol Constants
+// Full-duplex: Master and Slave exchange data simultaneously
+#define SPI_PACKET_HEADER 0xAA
+#define SPI_PACKET_SIZE 5  // Header + 2 bytes data + 1 byte aux + checksum
 
 // Mode values for slave->master communication
-#define MODE_AUTO   0x00   // Simulation mode (varying RPM)
-#define MODE_MANUAL 0x01   // Static 3000 RPM
+#define MODE_AUTO   0x00   // Auto mode (display received RPM)
+#define MODE_MANUAL 0x01   // Manual mode (display user-set RPM)
 
-// RPM Packet Structure (4 bytes)
+// Master->Slave Packet Structure (5 bytes)
 // Byte 0: Header (0xAA)
-// Byte 1: RPM low byte
+// Byte 1: RPM low byte (what slave should display)
 // Byte 2: RPM high byte
-// Byte 3: Checksum (XOR of bytes 0-2)
-struct RpmPacket {
+// Byte 3: Mode (MODE_AUTO or MODE_MANUAL) - master is authoritative
+// Byte 4: Checksum (XOR of bytes 0-3)
+
+// Slave->Master Packet Structure (5 bytes, sent simultaneously)
+// Byte 0: Header (0xAA)
+// Byte 1: Requested RPM low byte (slave UI input)
+// Byte 2: Requested RPM high byte
+// Byte 3: Requested Mode (slave UI input)
+// Byte 4: Checksum (XOR of bytes 0-3)
+
+struct SpiPacket {
     uint8_t header;
-    uint16_t rpm;
+    uint16_t value;      // RPM (master->slave) or Manual RPM (slave->master)
+    uint8_t aux;         // Reserved (master) or Mode (slave)
     uint8_t checksum;
 } __attribute__((packed));
 
-// Calculate checksum for RPM packet
+// Calculate checksum for SPI packet
+inline uint8_t calculateSpiChecksum(const uint8_t* data) {
+    return data[0] ^ data[1] ^ data[2] ^ data[3];
+}
+
+// Validate received packet
+inline bool validateSpiPacket(const uint8_t* data) {
+    if (data[0] != SPI_PACKET_HEADER) return false;
+    uint8_t expectedChecksum = calculateSpiChecksum(data);
+    return data[4] == expectedChecksum;
+}
+
+// Extract RPM from validated packet
+inline uint16_t extractSpiRpm(const uint8_t* data) {
+    return data[1] | (data[2] << 8);
+}
+
+// Extract mode from validated slave packet
+inline uint8_t extractSpiMode(const uint8_t* data) {
+    return data[3];
+}
+
+// Pack master->slave packet (RPM to display + authoritative mode)
+inline void packMasterPacket(uint8_t* buffer, uint16_t rpm, uint8_t mode) {
+    buffer[0] = SPI_PACKET_HEADER;
+    buffer[1] = rpm & 0xFF;
+    buffer[2] = (rpm >> 8) & 0xFF;
+    buffer[3] = mode;
+    buffer[4] = calculateSpiChecksum(buffer);
+}
+
+// Pack slave->master packet (Mode + Manual RPM)
+inline void packSlavePacket(uint8_t* buffer, uint8_t mode, uint16_t manualRpm) {
+    buffer[0] = SPI_PACKET_HEADER;
+    buffer[1] = manualRpm & 0xFF;
+    buffer[2] = (manualRpm >> 8) & 0xFF;
+    buffer[3] = mode;
+    buffer[4] = calculateSpiChecksum(buffer);
+}
+
+// Legacy I2C support (can be removed later)
+#define RPM_PACKET_HEADER SPI_PACKET_HEADER
+#define RPM_PACKET_SIZE 4
+
 inline uint8_t calculateChecksum(uint8_t header, uint16_t rpm) {
     uint8_t rpmLow = rpm & 0xFF;
     uint8_t rpmHigh = (rpm >> 8) & 0xFF;
     return header ^ rpmLow ^ rpmHigh;
 }
 
-// Validate received packet
 inline bool validatePacket(const uint8_t* data, size_t len) {
     if (len != RPM_PACKET_SIZE) return false;
     if (data[0] != RPM_PACKET_HEADER) return false;
-
     uint16_t rpm = data[1] | (data[2] << 8);
     uint8_t expectedChecksum = calculateChecksum(data[0], rpm);
     return data[3] == expectedChecksum;
 }
 
-// Extract RPM from validated packet
 inline uint16_t extractRpm(const uint8_t* data) {
     return data[1] | (data[2] << 8);
 }
 
-// Pack RPM into buffer
 inline void packRpmPacket(uint8_t* buffer, uint16_t rpm) {
     buffer[0] = RPM_PACKET_HEADER;
     buffer[1] = rpm & 0xFF;

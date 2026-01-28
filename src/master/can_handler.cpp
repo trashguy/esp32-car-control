@@ -23,8 +23,8 @@ static uint32_t errorCount = 0;
 bool canInit() {
     canInitialized = false;
 
-    // Initialize SPI for MCP2515
-    canSpi = new SPIClass(HSPI);
+    // Initialize SPI for MCP2515 using FSPI (SPI2) - separate from comm SPI on HSPI
+    canSpi = new SPIClass(FSPI);
     if (!canSpi) {
         Serial.println("Failed to allocate SPI!");
         return false;

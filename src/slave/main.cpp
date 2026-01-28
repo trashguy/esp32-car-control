@@ -1,30 +1,35 @@
 #include <Arduino.h>
-#include "i2c_slave.h"
+#include "slave/spi_slave.h"
 #include "display.h"
 #include "sd_card.h"
 #include "shared/config.h"
+#include "shared/protocol.h"
 
 // State
-static volatile bool newRpmAvailable = false;
+static volatile bool newDataAvailable = false;
 static volatile uint16_t latestRpm = 0;
-static uint16_t lastDisplayedRpm = 0;
+static volatile uint8_t latestMode = MODE_AUTO;
 
-// Callback when RPM is received via I2C
-void onRpmReceived(uint16_t rpm) {
-    // Only flag as new if RPM actually changed
-    if (rpm != latestRpm) {
+// Callback when data is received from master via SPI
+void onMasterData(uint16_t rpm, uint8_t mode) {
+    // Flag as new if anything changed
+    if (rpm != latestRpm || mode != latestMode) {
         latestRpm = rpm;
-        newRpmAvailable = true;
+        latestMode = mode;
+        newDataAvailable = true;
     }
 }
 
 void printStats() {
     Serial.println("\n=== Slave Statistics ===");
-    Serial.printf("Valid packets: %lu\n", i2cGetValidPacketCount());
-    Serial.printf("Invalid packets: %lu\n", i2cGetInvalidPacketCount());
-    Serial.printf("Last RPM: %u\n", i2cGetLastRpm());
-    Serial.printf("Connected: %s\n", i2cIsConnected() ? "YES" : "NO");
-    Serial.printf("Time since last packet: %lu ms\n", i2cGetTimeSinceLastPacket());
+    Serial.printf("Valid packets: %lu\n", spiSlaveGetValidPacketCount());
+    Serial.printf("Invalid packets: %lu\n", spiSlaveGetInvalidPacketCount());
+    Serial.printf("Last RPM from master: %u\n", spiSlaveGetLastRpm());
+    Serial.printf("Master mode: %s\n", spiSlaveGetMasterMode() == MODE_AUTO ? "AUTO" : "MANUAL");
+    Serial.printf("Connected: %s\n", spiSlaveIsConnected() ? "YES" : "NO");
+    Serial.printf("Time since last packet: %lu ms\n", spiSlaveGetTimeSinceLastPacket());
+    Serial.printf("Requested mode: %s\n", spiSlaveGetRequestedMode() == MODE_AUTO ? "AUTO" : "MANUAL");
+    Serial.printf("Requested RPM: %u\n", spiSlaveGetRequestedRpm());
     Serial.println();
 }
 
@@ -44,7 +49,7 @@ void processSerialCommand() {
         case '?':
         case 'h':
         case 'H':
-            Serial.println("\n=== I2C Display Slave ===");
+            Serial.println("\n=== SPI Display Slave ===");
             Serial.println("Commands:");
             Serial.println("  c - Show statistics");
             Serial.println("  ? - Show this help");
@@ -61,7 +66,7 @@ void setup() {
     delay(1000);
 
     Serial.println("\n\n========================================");
-    Serial.println("  ESP32-S3 I2C Display Slave");
+    Serial.println("  ESP32-S3 SPI Display Slave");
     Serial.println("========================================\n");
 
     Serial.printf("CPU Freq: %d MHz\n", getCpuFrequencyMhz());
@@ -77,31 +82,41 @@ void setup() {
         Serial.println("Display initialization failed!");
     }
 
-    // Initialize I2C slave on Wire1 (separate from touch on Wire)
-    if (!i2cSlaveInit(onRpmReceived)) {
-        Serial.println("I2C slave initialization failed!");
+    // Initialize SPI slave for master communication
+    if (!spiSlaveInit(onMasterData)) {
+        Serial.println("SPI slave initialization failed!");
     }
 
-    Serial.println("\nSlave ready. Waiting for RPM data...\n");
+    Serial.println("\nSlave ready. Master is source of truth.\n");
 }
 
 void loop() {
     // Process serial commands
     processSerialCommand();
 
-    // Update display with new RPM if available
-    if (newRpmAvailable) {
-        newRpmAvailable = false;
+    // Process SPI slave transactions
+    spiSlaveProcess();
+
+    // Check if we just reconnected - force display refresh even if values unchanged
+    if (spiSlaveCheckReconnected()) {
+        latestRpm = spiSlaveGetLastRpm();
+        latestMode = spiSlaveGetMasterMode();
+        newDataAvailable = true;
+    }
+
+    // Update display with data from master
+    if (newDataAvailable) {
+        newDataAvailable = false;
         displayUpdateRpm(latestRpm);
     }
 
     // Check connection status
-    bool connected = i2cIsConnected();
+    bool connected = spiSlaveIsConnected();
     displaySetConnected(connected);
 
     // Process display animations
     displayLoop();
 
     // Small delay to prevent busy-looping
-    delay(10);
+    delay(1);
 }
