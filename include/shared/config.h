@@ -5,7 +5,7 @@
 #define I2C_SLAVE_ADDRESS 0x42
 #define I2C_SDA_PIN 16
 #define I2C_SCL_PIN 15
-#define I2C_FREQUENCY 400000  // Fast mode (400kHz)
+#define I2C_FREQUENCY 100000  // Standard mode (100kHz)
 
 // Master - MCP2515 SPI Pins
 #define MCP2515_SCK_PIN  12
@@ -41,7 +41,7 @@
 #define SD_MMC_1BIT_MODE true
 
 // Timing
-#define I2C_SEND_INTERVAL_MS 100  // 10Hz update rate
+#define I2C_SEND_INTERVAL_MS 500  // 2Hz update rate (reduced for stability without pullups)
 #define I2C_TIMEOUT_MS 1000       // Show "NO SIGNAL" after 1 second
 
 // CAN Configuration

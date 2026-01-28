@@ -7,11 +7,15 @@
 // State
 static volatile bool newRpmAvailable = false;
 static volatile uint16_t latestRpm = 0;
+static uint16_t lastDisplayedRpm = 0;
 
 // Callback when RPM is received via I2C
 void onRpmReceived(uint16_t rpm) {
-    latestRpm = rpm;
-    newRpmAvailable = true;
+    // Only flag as new if RPM actually changed
+    if (rpm != latestRpm) {
+        latestRpm = rpm;
+        newRpmAvailable = true;
+    }
 }
 
 void printStats() {

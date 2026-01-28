@@ -13,7 +13,8 @@ enum DisplayState {
 enum ScreenType {
     SCREEN_MAIN,
     SCREEN_DIAGNOSTICS,
-    SCREEN_FILE_BROWSER
+    SCREEN_FILE_BROWSER,
+    SCREEN_WIFI
 };
 
 // Initialize display and touch

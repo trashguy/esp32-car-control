@@ -10,6 +10,7 @@ static const CAN_CLOCK CAN_CLOCK_SPEED = MCP_8MHZ; // Crystal on MCP2515 module
 
 static SPIClass* canSpi = nullptr;
 static MCP2515* canController = nullptr;
+static bool canInitialized = false;
 
 static CanMode currentMode = CAN_MODE_SNIFF;
 static uint32_t rpmMessageId = 0;
@@ -20,34 +21,45 @@ static uint32_t messageCount = 0;
 static uint32_t errorCount = 0;
 
 bool canInit() {
+    canInitialized = false;
+
     // Initialize SPI for MCP2515
     canSpi = new SPIClass(HSPI);
+    if (!canSpi) {
+        Serial.println("Failed to allocate SPI!");
+        return false;
+    }
     canSpi->begin(MCP2515_SCK_PIN, MCP2515_MISO_PIN, MCP2515_MOSI_PIN, MCP2515_CS_PIN);
 
     // Initialize MCP2515 (CS pin, SPI clock speed, SPI instance)
     canController = new MCP2515(MCP2515_CS_PIN, 10000000, canSpi);
+    if (!canController) {
+        Serial.println("Failed to allocate MCP2515!");
+        return false;
+    }
 
     MCP2515::ERROR result = canController->reset();
     if (result != MCP2515::ERROR_OK) {
-        Serial.println("MCP2515 reset failed!");
+        Serial.println("MCP2515 reset failed - CAN disabled");
         errorCount++;
         return false;
     }
 
     result = canController->setBitrate(CAN_BITRATE, CAN_CLOCK_SPEED);
     if (result != MCP2515::ERROR_OK) {
-        Serial.println("MCP2515 setBitrate failed!");
+        Serial.println("MCP2515 setBitrate failed - CAN disabled");
         errorCount++;
         return false;
     }
 
     result = canController->setNormalMode();
     if (result != MCP2515::ERROR_OK) {
-        Serial.println("MCP2515 setNormalMode failed!");
+        Serial.println("MCP2515 setNormalMode failed - CAN disabled");
         errorCount++;
         return false;
     }
 
+    canInitialized = true;
     Serial.println("MCP2515 initialized successfully");
     return true;
 }
@@ -116,7 +128,7 @@ static uint16_t extractRpmFromFrame(const struct can_frame& frame) {
 }
 
 bool canProcess(uint16_t* rpm) {
-    if (canController == nullptr) {
+    if (!canInitialized || canController == nullptr) {
         return false;
     }
 

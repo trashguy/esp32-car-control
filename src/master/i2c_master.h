@@ -14,4 +14,7 @@ bool i2cSendRpm(uint16_t rpm);
 uint32_t i2cGetSuccessCount();
 uint32_t i2cGetErrorCount();
 
+// Read mode from slave (returns MODE_AUTO, MODE_MANUAL, or 0xFF on error)
+uint8_t i2cReadMode();
+
 #endif // I2C_MASTER_H

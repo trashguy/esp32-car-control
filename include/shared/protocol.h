@@ -8,6 +8,10 @@
 #define RPM_PACKET_HEADER 0xAA
 #define RPM_PACKET_SIZE 4
 
+// Mode values for slave->master communication
+#define MODE_AUTO   0x00   // Simulation mode (varying RPM)
+#define MODE_MANUAL 0x01   // Static 3000 RPM
+
 // RPM Packet Structure (4 bytes)
 // Byte 0: Header (0xAA)
 // Byte 1: RPM low byte

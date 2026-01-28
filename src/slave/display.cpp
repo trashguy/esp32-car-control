@@ -2,10 +2,13 @@
 #include "i2c_slave.h"
 #include "sd_card.h"
 #include "shared/config.h"
+#include "shared/protocol.h"
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include <SD_MMC.h>
+#include <WiFi.h>
+#include <Preferences.h>
 #include <math.h>
 
 // FT6336G Touch Controller (FocalTech FT6x36 family)
@@ -48,17 +51,22 @@ static bool blinkState = false;
 #define LABEL_Y_POS   140
 #define STATUS_Y_POS  165
 
-// Test button layout
-#define BTN_WIDTH     100
-#define BTN_HEIGHT    40
-#define BTN_X         ((SCREEN_WIDTH - BTN_WIDTH) / 2)
-#define BTN_Y         (SCREEN_HEIGHT - BTN_HEIGHT - 10)
+// Logo layout
+#define LOGO_Y_POS    (SCREEN_HEIGHT - 30)
+#define LOGO_3D_OFFSET 2
+
+// Button styling
 #define BTN_RADIUS    8
 
 // Gear button layout (bottom right)
 #define GEAR_BTN_SIZE   36
 #define GEAR_BTN_X      (SCREEN_WIDTH - GEAR_BTN_SIZE - 8)
 #define GEAR_BTN_Y      (SCREEN_HEIGHT - GEAR_BTN_SIZE - 8)
+
+// Mode button layout (bottom left, opposite of gear button)
+#define MODE_BTN_SIZE   36
+#define MODE_BTN_X      8
+#define MODE_BTN_Y      (SCREEN_HEIGHT - MODE_BTN_SIZE - 8)
 
 // Back button layout (diagnostics screen - center)
 #define BACK_BTN_WIDTH  80
@@ -83,15 +91,52 @@ static bool blinkState = false;
 #define MAX_VISIBLE_FILES   ((FILE_LIST_Y_END - FILE_LIST_Y_START) / FILE_LINE_HEIGHT)
 #define MAX_FILES           64
 
+// WiFi button layout (diagnostics screen - bottom left)
+#define WIFI_BTN_SIZE       36
+#define WIFI_BTN_X          8
+#define WIFI_BTN_Y          (SCREEN_HEIGHT - WIFI_BTN_SIZE - 8)
+
+// WiFi screen layout (scrollable content area)
+#define WIFI_CONTENT_Y      40
+#define WIFI_CONTENT_H      (SCREEN_HEIGHT - WIFI_CONTENT_Y - 10)
+#define WIFI_MODE_BTN_X     10
+#define WIFI_MODE_BTN_Y     10   // Relative to scroll offset
+#define WIFI_MODE_BTN_W     300
+#define WIFI_MODE_BTN_H     30
+#define WIFI_SSID_Y         50   // Relative to scroll offset
+#define WIFI_PASS_Y         90   // Relative to scroll offset
+#define WIFI_INPUT_X        10
+#define WIFI_INPUT_W        300
+#define WIFI_INPUT_H        28
+#define WIFI_LIST_Y         150  // Relative to scroll offset (below scan button)
+#define WIFI_LIST_H         22
+#define MAX_WIFI_NETWORKS   5
+#define MAX_SSID_LEN        32
+#define MAX_PASS_LEN        64
+#define WIFI_SCROLL_MAX     50   // Max scroll offset
+
+// Full-screen QWERTY Keyboard layout
+#define KB_HEADER_H         45   // Height for text entry display
+#define KB_KEY_H            36   // Key height
+#define KB_KEY_W            30   // Standard key width
+#define KB_WIDE_KEY_W       45   // Wide key width (shift, del, etc)
+#define KB_SPACE_W          120  // Space bar width
+#define KB_SPACING          2
+#define KB_START_Y          (KB_HEADER_H + 5)
+
 // Screen state
 static ScreenType currentScreen = SCREEN_MAIN;
 
 // Button state
-static bool testButtonPressed = false;
 static bool gearButtonPressed = false;
 static bool backButtonPressed = false;
 static bool sdButtonPressed = false;
 static bool arrowButtonPressed = false;
+static bool wifiButtonPressed = false;
+static bool wifiModeButtonPressed = false;
+static bool wifiBackButtonPressed = false;
+static bool wifiScanButtonPressed = false;
+static bool modeButtonPressed = false;
 static bool lastTouchState = false;
 
 // File browser state
@@ -101,6 +146,58 @@ static int scrollOffset = 0;
 static int16_t lastTouchY = -1;
 static bool isDragging = false;
 
+// Diagnostics screen state
+static int diagScrollOffset = 0;
+#define DIAG_CONTENT_Y      40
+#define DIAG_CONTENT_H      (SCREEN_HEIGHT - DIAG_CONTENT_Y - 50)
+#define DIAG_TOTAL_HEIGHT   220  // Total content height (will be calculated)
+
+// WiFi state
+static int wifiMode = 0;  // 0 = disabled, 1 = client, 2 = AP
+static char wifiSsid[MAX_SSID_LEN + 1] = "";
+static char wifiPassword[MAX_PASS_LEN + 1] = "";
+static int activeInput = 0;  // 0 = none, 1 = SSID, 2 = password
+static unsigned long lastWifiStatusCheck = 0;
+static bool lastWifiConnected = false;
+
+// WiFi scan results
+struct WifiNetwork {
+    char ssid[MAX_SSID_LEN + 1];
+    int32_t rssi;
+};
+static WifiNetwork wifiNetworks[MAX_WIFI_NETWORKS];
+static int wifiNetworkCount = 0;
+static unsigned long lastWifiScan = 0;
+static bool wifiScanInProgress = false;
+
+// Preferences for persistent storage
+static Preferences prefs;
+
+// Full-screen keyboard state
+static bool keyboardVisible = false;
+static bool keyboardShift = false;
+static bool keyboardSymbols = false;  // Show symbols/numbers instead of letters
+static char* keyboardTarget = nullptr;  // Pointer to string being edited
+static int keyboardTargetMax = 0;       // Max length of target string
+static const char* keyboardLabel = "";  // Label to show (e.g., "SSID:" or "Password:")
+static bool keyboardIsPassword = false; // Whether to mask input
+
+// QWERTY keyboard layouts
+static const char* kbRowLetters[] = {
+    "qwertyuiop",
+    "asdfghjkl",
+    "zxcvbnm"
+};
+static const char* kbRowNumbers = "1234567890";
+static const char* kbRowSymbols1 = "!@#$%^&*()";
+static const char* kbRowSymbols2 = "-_=+[]{}";
+static const char* kbRowSymbols3 = ";:'\",.?/";
+
+// Forward declarations
+static void switchToScreen(ScreenType screen);
+static void drawWifiScanButton(bool pressed);
+static void drawModeButton(bool pressed);
+
 static void drawBackground() {
     tft.fillScreen(COLOR_BACKGROUND);
 
@@ -108,7 +205,7 @@ static void drawBackground() {
     tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
     tft.setTextDatum(TC_DATUM);
     tft.setTextSize(2);
-    tft.drawString("VOLVO C60 RPM", SCREEN_WIDTH / 2, 10);
+    tft.drawString("POWER STEERING", SCREEN_WIDTH / 2, 10);
 
     // Draw RPM label
     tft.setTextSize(2);
@@ -157,23 +254,21 @@ static void drawStatusIndicator(bool connected) {
     }
 }
 
-static void drawTestButton(bool pressed) {
-    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+static void drawVonderwagen3DLogo() {
+    // 3D styled logo "Vonderwagen" at bottom center
+    const char* logoText = "Vonderwagen";
+    int16_t centerX = SCREEN_WIDTH / 2;
 
-    // Draw rounded rectangle button
-    tft.fillRoundRect(BTN_X, BTN_Y, BTN_WIDTH, BTN_HEIGHT, BTN_RADIUS, btnColor);
-    tft.drawRoundRect(BTN_X, BTN_Y, BTN_WIDTH, BTN_HEIGHT, BTN_RADIUS, COLOR_BTN_TEXT);
-
-    // Draw button text
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(2);
-    tft.setTextColor(COLOR_BTN_TEXT, btnColor);
-    tft.drawString("TEST", BTN_X + BTN_WIDTH / 2, BTN_Y + BTN_HEIGHT / 2);
-}
 
-static bool isTouchInTestButton(int16_t x, int16_t y) {
-    return (x >= BTN_X && x <= BTN_X + BTN_WIDTH &&
-            y >= BTN_Y && y <= BTN_Y + BTN_HEIGHT);
+    // Draw shadow for 3D effect
+    tft.setTextColor(0x4228, COLOR_BACKGROUND);
+    tft.drawString(logoText, centerX + 2, LOGO_Y_POS + 2);
+
+    // Main text
+    tft.setTextColor(0xFFFF, COLOR_BACKGROUND);
+    tft.drawString(logoText, centerX, LOGO_Y_POS);
 }
 
 static bool isTouchInGearButton(int16_t x, int16_t y) {
@@ -231,6 +326,26 @@ static void drawGearButton(bool pressed) {
 
     // Draw gear icon (size parameter controls overall gear size)
     drawGearIcon(cx, cy, GEAR_BTN_SIZE, COLOR_BTN_TEXT);
+}
+
+static void drawModeButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    uint8_t mode = i2cGetMode();
+
+    // Draw button background
+    tft.fillRoundRect(MODE_BTN_X, MODE_BTN_Y, MODE_BTN_SIZE, MODE_BTN_SIZE, 6, btnColor);
+    tft.drawRoundRect(MODE_BTN_X, MODE_BTN_Y, MODE_BTN_SIZE, MODE_BTN_SIZE, 6, COLOR_BTN_TEXT);
+
+    // Draw A or M
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(3);
+    tft.setTextColor(mode == MODE_AUTO ? COLOR_CONNECTED : COLOR_WARNING, btnColor);
+    tft.drawString(mode == MODE_AUTO ? "A" : "M", MODE_BTN_X + MODE_BTN_SIZE / 2, MODE_BTN_Y + MODE_BTN_SIZE / 2);
+}
+
+static bool isTouchInModeButton(int16_t x, int16_t y) {
+    return (x >= MODE_BTN_X && x <= MODE_BTN_X + MODE_BTN_SIZE &&
+            y >= MODE_BTN_Y && y <= MODE_BTN_Y + MODE_BTN_SIZE);
 }
 
 static void drawBackButton(bool pressed) {
@@ -309,6 +424,645 @@ static void drawArrowButton(bool pressed) {
     drawBackArrowIcon(cx, cy, ARROW_BTN_SIZE - 8, COLOR_BTN_TEXT);
 }
 
+static void drawWifiIcon(int16_t cx, int16_t cy, int16_t size, uint16_t color) {
+    // Draw WiFi signal arcs
+    int16_t baseY = cy + size / 4;
+
+    // Draw three arcs (signal strength indicators)
+    for (int i = 0; i < 3; i++) {
+        int16_t r = (i + 1) * size / 4;
+        // Draw arc using multiple small lines
+        for (int a = -45; a <= 45; a += 10) {
+            float rad = a * 3.14159 / 180.0;
+            int16_t x1 = cx + cos(rad - 3.14159/2) * r;
+            int16_t y1 = baseY + sin(rad - 3.14159/2) * r;
+            int16_t x2 = cx + cos(rad - 3.14159/2 + 0.17) * r;
+            int16_t y2 = baseY + sin(rad - 3.14159/2 + 0.17) * r;
+            tft.drawLine(x1, y1, x2, y2, color);
+        }
+    }
+
+    // Draw center dot
+    tft.fillCircle(cx, baseY, 2, color);
+}
+
+static void drawWifiButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    int16_t cx = WIFI_BTN_X + WIFI_BTN_SIZE / 2;
+    int16_t cy = WIFI_BTN_Y + WIFI_BTN_SIZE / 2;
+
+    // Draw button background
+    tft.fillRoundRect(WIFI_BTN_X, WIFI_BTN_Y, WIFI_BTN_SIZE, WIFI_BTN_SIZE, 6, btnColor);
+    tft.drawRoundRect(WIFI_BTN_X, WIFI_BTN_Y, WIFI_BTN_SIZE, WIFI_BTN_SIZE, 6, COLOR_BTN_TEXT);
+
+    // Draw WiFi icon
+    drawWifiIcon(cx, cy, WIFI_BTN_SIZE - 12, COLOR_BTN_TEXT);
+}
+
+static bool isTouchInWifiButton(int16_t x, int16_t y) {
+    return (x >= WIFI_BTN_X && x <= WIFI_BTN_X + WIFI_BTN_SIZE &&
+            y >= WIFI_BTN_Y && y <= WIFI_BTN_Y + WIFI_BTN_SIZE);
+}
+
+static bool isTouchInWifiModeButton(int16_t x, int16_t y) {
+    int16_t btnY = WIFI_CONTENT_Y + WIFI_MODE_BTN_Y;
+    return (x >= WIFI_MODE_BTN_X && x <= WIFI_MODE_BTN_X + WIFI_MODE_BTN_W &&
+            y >= btnY && y <= btnY + WIFI_MODE_BTN_H);
+}
+
+// WiFi connection status indicator (top right of screen)
+#define WIFI_STATUS_X   (SCREEN_WIDTH - 25)
+#define WIFI_STATUS_Y   12
+#define WIFI_STATUS_SIZE 16
+
+static void drawWifiStatusIndicator() {
+    // Check if WiFi is connected
+    bool connected = (wifiMode == 1 && WiFi.status() == WL_CONNECTED);
+
+    if (connected) {
+        drawWifiIcon(WIFI_STATUS_X, WIFI_STATUS_Y, WIFI_STATUS_SIZE, COLOR_CONNECTED);
+    } else {
+        // Clear the area if not connected
+        tft.fillRect(WIFI_STATUS_X - WIFI_STATUS_SIZE/2 - 2, WIFI_STATUS_Y - WIFI_STATUS_SIZE/2 - 2,
+                     WIFI_STATUS_SIZE + 4, WIFI_STATUS_SIZE + 4, COLOR_BACKGROUND);
+    }
+}
+
+static bool isTouchInSsidInput(int16_t x, int16_t y) {
+    int16_t inputY = WIFI_CONTENT_Y + WIFI_SSID_Y;
+    return (x >= WIFI_INPUT_X && x <= WIFI_INPUT_X + WIFI_INPUT_W &&
+            y >= inputY && y <= inputY + WIFI_INPUT_H);
+}
+
+static bool isTouchInPassInput(int16_t x, int16_t y) {
+    int16_t inputY = WIFI_CONTENT_Y + WIFI_PASS_Y;
+    return (x >= WIFI_INPUT_X && x <= WIFI_INPUT_X + WIFI_INPUT_W &&
+            y >= inputY && y <= inputY + WIFI_INPUT_H);
+}
+
+static bool isTouchInWifiNetwork(int16_t x, int16_t y, int* networkIndex) {
+    int16_t listY = WIFI_CONTENT_Y + WIFI_LIST_Y;
+    if (x >= WIFI_INPUT_X && x <= WIFI_INPUT_X + WIFI_INPUT_W &&
+        y >= listY && y < listY + (MAX_WIFI_NETWORKS * WIFI_LIST_H)) {
+        *networkIndex = (y - listY) / WIFI_LIST_H;
+        return (*networkIndex < wifiNetworkCount);
+    }
+    return false;
+}
+
+static void scanWifiNetworks() {
+    if (wifiScanInProgress || wifiMode == 0) return;  // Don't scan if disabled
+
+    wifiScanInProgress = true;
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    delay(100);
+
+    int n = WiFi.scanNetworks();
+    wifiNetworkCount = 0;
+
+    // Sort by signal strength and take top 5
+    for (int i = 0; i < n && wifiNetworkCount < MAX_WIFI_NETWORKS; i++) {
+        // Find strongest remaining network
+        int bestIdx = -1;
+        int32_t bestRssi = -999;
+        for (int j = 0; j < n; j++) {
+            bool alreadyAdded = false;
+            for (int k = 0; k < wifiNetworkCount; k++) {
+                if (strcmp(wifiNetworks[k].ssid, WiFi.SSID(j).c_str()) == 0) {
+                    alreadyAdded = true;
+                    break;
+                }
+            }
+            if (!alreadyAdded && WiFi.RSSI(j) > bestRssi) {
+                bestRssi = WiFi.RSSI(j);
+                bestIdx = j;
+            }
+        }
+        if (bestIdx >= 0) {
+            strncpy(wifiNetworks[wifiNetworkCount].ssid, WiFi.SSID(bestIdx).c_str(), MAX_SSID_LEN);
+            wifiNetworks[wifiNetworkCount].ssid[MAX_SSID_LEN] = '\0';
+            wifiNetworks[wifiNetworkCount].rssi = bestRssi;
+            wifiNetworkCount++;
+        }
+    }
+
+    WiFi.scanDelete();
+    wifiScanInProgress = false;
+    lastWifiScan = millis();
+}
+
+static void saveWifiSettings() {
+    prefs.begin("wifi", false);
+    prefs.putInt("mode", wifiMode);
+    prefs.putString("ssid", wifiSsid);
+    prefs.putString("pass", wifiPassword);
+    prefs.end();
+}
+
+static void loadWifiSettings() {
+    prefs.begin("wifi", true);
+    wifiMode = prefs.getInt("mode", 0);  // Default: disabled
+    String ssid = prefs.getString("ssid", "");
+    String pass = prefs.getString("pass", "");
+    strncpy(wifiSsid, ssid.c_str(), MAX_SSID_LEN);
+    strncpy(wifiPassword, pass.c_str(), MAX_PASS_LEN);
+    prefs.end();
+}
+
+static const char* getWifiModeString() {
+    switch (wifiMode) {
+        case 0: return "Mode: Disabled";
+        case 1: return "Mode: Client";
+        default: return "Mode: Unknown";
+    }
+}
+
+static void drawWifiModeButton() {
+    uint16_t btnColor = wifiModeButtonPressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    int16_t y = WIFI_CONTENT_Y + WIFI_MODE_BTN_Y;
+
+    tft.fillRoundRect(WIFI_MODE_BTN_X, y, WIFI_MODE_BTN_W, WIFI_MODE_BTN_H, 6, btnColor);
+    tft.drawRoundRect(WIFI_MODE_BTN_X, y, WIFI_MODE_BTN_W, WIFI_MODE_BTN_H, 6, COLOR_BTN_TEXT);
+
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_BTN_TEXT, btnColor);
+    tft.drawString(getWifiModeString(), WIFI_MODE_BTN_X + WIFI_MODE_BTN_W / 2, y + WIFI_MODE_BTN_H / 2);
+}
+
+// Full-screen QWERTY Keyboard functions
+static void drawKeyboardKey(int16_t x, int16_t y, int16_t w, const char* label, uint16_t color) {
+    tft.fillRoundRect(x, y, w, KB_KEY_H, 4, color);
+    tft.drawRoundRect(x, y, w, KB_KEY_H, 4, COLOR_BTN_TEXT);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_BTN_TEXT, color);
+    tft.drawString(label, x + w / 2, y + KB_KEY_H / 2);
+}
+
+static void drawKeyboard() {
+    if (!keyboardVisible) return;
+
+    // Fill entire screen with keyboard background
+    tft.fillScreen(0x1082);
+
+    // Draw header with label and current text
+    tft.fillRect(0, 0, SCREEN_WIDTH, KB_HEADER_H, COLOR_BACKGROUND);
+    tft.drawLine(0, KB_HEADER_H, SCREEN_WIDTH, KB_HEADER_H, COLOR_BTN_TEXT);
+
+    // Draw label
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
+    tft.drawString(keyboardLabel, 10, 5);
+
+    // Draw current text in input box
+    tft.fillRoundRect(5, 18, SCREEN_WIDTH - 10, 24, 4, COLOR_BTN_NORMAL);
+    tft.drawRoundRect(5, 18, SCREEN_WIDTH - 10, 24, 4, COLOR_CONNECTED);
+
+    tft.setTextDatum(ML_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_RPM_TEXT, COLOR_BTN_NORMAL);
+
+    if (keyboardTarget) {
+        if (keyboardIsPassword && strlen(keyboardTarget) > 0) {
+            // Show asterisks for password
+            char masked[MAX_PASS_LEN + 1];
+            int len = strlen(keyboardTarget);
+            for (int i = 0; i < len && i < MAX_PASS_LEN; i++) masked[i] = '*';
+            masked[len] = '\0';
+            tft.drawString(masked, 12, 30);
+        } else {
+            tft.drawString(keyboardTarget, 12, 30);
+        }
+    }
+
+    int16_t y = KB_START_Y;
+    int16_t x;
+    char keyStr[2] = {0, 0};
+
+    // Row 1: Numbers or symbols row 1
+    const char* row1 = keyboardSymbols ? kbRowSymbols1 : kbRowNumbers;
+    x = 2;
+    for (int i = 0; i < 10; i++) {
+        keyStr[0] = row1[i];
+        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
+        x += KB_KEY_W + KB_SPACING;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 2: QWERTYUIOP or symbols row 2
+    const char* row2 = keyboardSymbols ? kbRowSymbols2 : kbRowLetters[0];
+    int row2len = strlen(row2);
+    x = (SCREEN_WIDTH - (row2len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
+    for (int i = 0; i < row2len; i++) {
+        keyStr[0] = row2[i];
+        if (!keyboardSymbols && keyboardShift) keyStr[0] = toupper(keyStr[0]);
+        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
+        x += KB_KEY_W + KB_SPACING;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 3: ASDFGHJKL or symbols row 3
+    const char* row3 = keyboardSymbols ? kbRowSymbols3 : kbRowLetters[1];
+    int row3len = strlen(row3);
+    x = (SCREEN_WIDTH - (row3len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
+    for (int i = 0; i < row3len; i++) {
+        keyStr[0] = row3[i];
+        if (!keyboardSymbols && keyboardShift) keyStr[0] = toupper(keyStr[0]);
+        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
+        x += KB_KEY_W + KB_SPACING;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 4: SHIFT + ZXCVBNM + DEL
+    x = 2;
+    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "SHIFT", keyboardShift ? COLOR_CONNECTED : COLOR_BTN_NORMAL);
+    x += KB_WIDE_KEY_W + KB_SPACING;
+
+    const char* row4 = kbRowLetters[2];
+    for (int i = 0; i < 7; i++) {
+        keyStr[0] = row4[i];
+        if (keyboardShift) keyStr[0] = toupper(keyStr[0]);
+        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
+        x += KB_KEY_W + KB_SPACING;
+    }
+    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "DEL", COLOR_DISCONNECTED);
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 5: ?123 + SPACE + . + OK + BACK
+    x = 2;
+    drawKeyboardKey(x, y, KB_WIDE_KEY_W, keyboardSymbols ? "ABC" : "?123", COLOR_BTN_NORMAL);
+    x += KB_WIDE_KEY_W + KB_SPACING;
+
+    drawKeyboardKey(x, y, KB_SPACE_W, "SPACE", COLOR_BTN_NORMAL);
+    x += KB_SPACE_W + KB_SPACING;
+
+    drawKeyboardKey(x, y, KB_KEY_W, ".", COLOR_BTN_NORMAL);
+    x += KB_KEY_W + KB_SPACING;
+
+    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "OK", COLOR_CONNECTED);
+    x += KB_WIDE_KEY_W + KB_SPACING;
+
+    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "BACK", COLOR_WARNING);
+}
+
+static void showKeyboard(const char* label, char* target, int maxLen, bool isPassword) {
+    keyboardLabel = label;
+    keyboardTarget = target;
+    keyboardTargetMax = maxLen;
+    keyboardIsPassword = isPassword;
+    keyboardShift = false;
+    keyboardSymbols = false;
+    keyboardVisible = true;
+    drawKeyboard();
+}
+
+static void connectToWifi() {
+    if (wifiMode == 1 && strlen(wifiSsid) > 0) {
+        WiFi.disconnect();
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(wifiSsid, wifiPassword);
+        Serial.printf("Connecting to WiFi: %s\n", wifiSsid);
+    }
+}
+
+static void hideKeyboard(bool save) {
+    keyboardVisible = false;
+    keyboardTarget = nullptr;
+    if (save) {
+        saveWifiSettings();
+        connectToWifi();
+    }
+}
+
+static void keyboardAddChar(char c) {
+    if (!keyboardTarget) return;
+    int len = strlen(keyboardTarget);
+    if (len < keyboardTargetMax) {
+        keyboardTarget[len] = c;
+        keyboardTarget[len + 1] = '\0';
+    }
+}
+
+static void keyboardDeleteChar() {
+    if (!keyboardTarget) return;
+    int len = strlen(keyboardTarget);
+    if (len > 0) {
+        keyboardTarget[len - 1] = '\0';
+    }
+}
+
+static void handleKeyboardTouch(int16_t touchX, int16_t touchY) {
+    if (!keyboardVisible) return;
+
+    int16_t y = KB_START_Y;
+    char keyStr[2] = {0, 0};
+
+    // Row 1: Numbers/symbols
+    if (touchY >= y && touchY < y + KB_KEY_H) {
+        const char* row1 = keyboardSymbols ? kbRowSymbols1 : kbRowNumbers;
+        int col = (touchX - 2) / (KB_KEY_W + KB_SPACING);
+        if (col >= 0 && col < 10) {
+            keyboardAddChar(row1[col]);
+            drawKeyboard();
+        }
+        return;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 2: QWERTYUIOP or symbols
+    if (touchY >= y && touchY < y + KB_KEY_H) {
+        const char* row2 = keyboardSymbols ? kbRowSymbols2 : kbRowLetters[0];
+        int row2len = strlen(row2);
+        int16_t startX = (SCREEN_WIDTH - (row2len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
+        int col = (touchX - startX) / (KB_KEY_W + KB_SPACING);
+        if (col >= 0 && col < row2len) {
+            char c = row2[col];
+            if (!keyboardSymbols && keyboardShift) c = toupper(c);
+            keyboardAddChar(c);
+            if (keyboardShift) keyboardShift = false;  // Auto-unshift
+            drawKeyboard();
+        }
+        return;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 3: ASDFGHJKL or symbols
+    if (touchY >= y && touchY < y + KB_KEY_H) {
+        const char* row3 = keyboardSymbols ? kbRowSymbols3 : kbRowLetters[1];
+        int row3len = strlen(row3);
+        int16_t startX = (SCREEN_WIDTH - (row3len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
+        int col = (touchX - startX) / (KB_KEY_W + KB_SPACING);
+        if (col >= 0 && col < row3len) {
+            char c = row3[col];
+            if (!keyboardSymbols && keyboardShift) c = toupper(c);
+            keyboardAddChar(c);
+            if (keyboardShift) keyboardShift = false;
+            drawKeyboard();
+        }
+        return;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 4: SHIFT + ZXCVBNM + DEL
+    if (touchY >= y && touchY < y + KB_KEY_H) {
+        int16_t x = 2;
+        // SHIFT
+        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
+            keyboardShift = !keyboardShift;
+            drawKeyboard();
+            return;
+        }
+        x += KB_WIDE_KEY_W + KB_SPACING;
+
+        // ZXCVBNM
+        for (int i = 0; i < 7; i++) {
+            if (touchX >= x && touchX < x + KB_KEY_W) {
+                char c = kbRowLetters[2][i];
+                if (keyboardShift) c = toupper(c);
+                keyboardAddChar(c);
+                if (keyboardShift) keyboardShift = false;
+                drawKeyboard();
+                return;
+            }
+            x += KB_KEY_W + KB_SPACING;
+        }
+
+        // DEL
+        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
+            keyboardDeleteChar();
+            drawKeyboard();
+            return;
+        }
+        return;
+    }
+    y += KB_KEY_H + KB_SPACING;
+
+    // Row 5: ?123 + SPACE + . + OK + BACK
+    if (touchY >= y && touchY < y + KB_KEY_H) {
+        int16_t x = 2;
+
+        // ?123 / ABC
+        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
+            keyboardSymbols = !keyboardSymbols;
+            drawKeyboard();
+            return;
+        }
+        x += KB_WIDE_KEY_W + KB_SPACING;
+
+        // SPACE
+        if (touchX >= x && touchX < x + KB_SPACE_W) {
+            keyboardAddChar(' ');
+            drawKeyboard();
+            return;
+        }
+        x += KB_SPACE_W + KB_SPACING;
+
+        // .
+        if (touchX >= x && touchX < x + KB_KEY_W) {
+            keyboardAddChar('.');
+            drawKeyboard();
+            return;
+        }
+        x += KB_KEY_W + KB_SPACING;
+
+        // OK
+        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
+            hideKeyboard(true);
+            switchToScreen(SCREEN_WIFI);
+            return;
+        }
+        x += KB_WIDE_KEY_W + KB_SPACING;
+
+        // BACK
+        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
+            // Restore original value? For now just close without saving
+            hideKeyboard(false);
+            switchToScreen(SCREEN_WIFI);
+            return;
+        }
+    }
+}
+
+static void drawWifiInput(int16_t y, const char* label, const char* value, bool active) {
+    // Label
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
+    tft.drawString(label, WIFI_INPUT_X, y - 12);
+
+    // Input box
+    uint16_t boxColor = active ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    tft.fillRoundRect(WIFI_INPUT_X, y, WIFI_INPUT_W, WIFI_INPUT_H, 4, boxColor);
+    tft.drawRoundRect(WIFI_INPUT_X, y, WIFI_INPUT_W, WIFI_INPUT_H, 4,
+                      active ? COLOR_CONNECTED : COLOR_BTN_TEXT);
+
+    // Text value (show plain text, no masking)
+    tft.setTextDatum(ML_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_RPM_TEXT, boxColor);
+    tft.drawString(value, WIFI_INPUT_X + 6, y + WIFI_INPUT_H / 2);
+
+    // Draw cursor if active
+    if (active) {
+        int textWidth = tft.textWidth(value);
+        tft.fillRect(WIFI_INPUT_X + 6 + textWidth + 2, y + 6, 2, WIFI_INPUT_H - 12, COLOR_RPM_TEXT);
+    }
+}
+
+static void drawWifiNetworkList() {
+    int16_t baseY = WIFI_CONTENT_Y + WIFI_LIST_Y;
+    int16_t listH = MAX_WIFI_NETWORKS * WIFI_LIST_H;
+
+    // Draw list box
+    tft.fillRect(WIFI_INPUT_X, baseY, WIFI_INPUT_W, listH, COLOR_BACKGROUND);
+    tft.drawRect(WIFI_INPUT_X, baseY, WIFI_INPUT_W, listH, COLOR_BTN_TEXT);
+
+    if (wifiNetworkCount == 0) {
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(COLOR_BTN_TEXT, COLOR_BACKGROUND);
+        const char* msg;
+        if (wifiMode == 0) {
+            msg = "WiFi Disabled";
+        } else if (wifiScanInProgress) {
+            msg = "Scanning...";
+        } else {
+            msg = "Press SCAN to search";
+        }
+        tft.drawString(msg, WIFI_INPUT_X + WIFI_INPUT_W / 2, baseY + listH / 2);
+        return;
+    }
+
+    for (int i = 0; i < wifiNetworkCount; i++) {
+        int16_t itemY = baseY + i * WIFI_LIST_H;
+
+        // Alternating background
+        if (i % 2 == 1) {
+            tft.fillRect(WIFI_INPUT_X + 1, itemY, WIFI_INPUT_W - 2, WIFI_LIST_H, 0x1082);
+        }
+
+        // SSID
+        tft.setTextDatum(ML_DATUM);
+        tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
+        tft.drawString(wifiNetworks[i].ssid, WIFI_INPUT_X + 6, itemY + WIFI_LIST_H / 2);
+
+        // Signal strength indicator
+        int bars = 0;
+        if (wifiNetworks[i].rssi > -50) bars = 4;
+        else if (wifiNetworks[i].rssi > -60) bars = 3;
+        else if (wifiNetworks[i].rssi > -70) bars = 2;
+        else bars = 1;
+
+        int16_t barX = WIFI_INPUT_X + WIFI_INPUT_W - 30;
+        for (int b = 0; b < 4; b++) {
+            int16_t barH = 4 + b * 3;
+            uint16_t barColor = (b < bars) ? COLOR_CONNECTED : COLOR_BTN_NORMAL;
+            tft.fillRect(barX + b * 6, itemY + WIFI_LIST_H - barH - 2, 4, barH, barColor);
+        }
+    }
+}
+
+static void drawWifiScreenContent() {
+    // Clear content area (not title)
+    int16_t contentEndY = SCREEN_HEIGHT - 50;
+    tft.fillRect(0, WIFI_CONTENT_Y, SCREEN_WIDTH, contentEndY - WIFI_CONTENT_Y, COLOR_BACKGROUND);
+
+    // Mode toggle button
+    drawWifiModeButton();
+
+    // SSID input
+    drawWifiInput(WIFI_CONTENT_Y + WIFI_SSID_Y, "SSID:", wifiSsid, activeInput == 1);
+
+    // Password input (show plain text)
+    drawWifiInput(WIFI_CONTENT_Y + WIFI_PASS_Y, "Password:", wifiPassword, activeInput == 2);
+
+    // Scan button and network list (only if not in AP mode and wifi enabled)
+    if (wifiMode == 1) {
+        drawWifiScanButton(wifiScanButtonPressed);
+        drawWifiNetworkList();
+    }
+}
+
+// WiFi screen header back button (top left, header-sized)
+#define WIFI_BACK_BTN_X     5
+#define WIFI_BACK_BTN_Y     5
+#define WIFI_BACK_BTN_W     50
+#define WIFI_BACK_BTN_H     26
+
+// WiFi scan button (above network list)
+#define WIFI_SCAN_BTN_X     10
+#define WIFI_SCAN_BTN_Y     118   // Relative to WIFI_CONTENT_Y
+#define WIFI_SCAN_BTN_W     100
+#define WIFI_SCAN_BTN_H     26
+
+static void drawWifiBackButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+
+    tft.fillRoundRect(WIFI_BACK_BTN_X, WIFI_BACK_BTN_Y, WIFI_BACK_BTN_W, WIFI_BACK_BTN_H, 4, btnColor);
+    tft.drawRoundRect(WIFI_BACK_BTN_X, WIFI_BACK_BTN_Y, WIFI_BACK_BTN_W, WIFI_BACK_BTN_H, 4, COLOR_BTN_TEXT);
+
+    // Draw back arrow and text
+    int16_t cx = WIFI_BACK_BTN_X + 12;
+    int16_t cy = WIFI_BACK_BTN_Y + WIFI_BACK_BTN_H / 2;
+
+    // Small arrow
+    tft.fillTriangle(cx - 4, cy, cx + 2, cy - 5, cx + 2, cy + 5, COLOR_BTN_TEXT);
+
+    // "Back" text
+    tft.setTextDatum(ML_DATUM);
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_BTN_TEXT, btnColor);
+    tft.drawString("Back", cx + 6, cy);
+}
+
+static bool isTouchInWifiBackButton(int16_t x, int16_t y) {
+    return (x >= WIFI_BACK_BTN_X && x <= WIFI_BACK_BTN_X + WIFI_BACK_BTN_W &&
+            y >= WIFI_BACK_BTN_Y && y <= WIFI_BACK_BTN_Y + WIFI_BACK_BTN_H);
+}
+
+static void drawWifiScanButton(bool pressed) {
+    uint16_t btnColor = pressed ? COLOR_BTN_PRESSED : COLOR_BTN_NORMAL;
+    int16_t y = WIFI_CONTENT_Y + WIFI_SCAN_BTN_Y;
+
+    tft.fillRoundRect(WIFI_SCAN_BTN_X, y, WIFI_SCAN_BTN_W, WIFI_SCAN_BTN_H, 4, btnColor);
+    tft.drawRoundRect(WIFI_SCAN_BTN_X, y, WIFI_SCAN_BTN_W, WIFI_SCAN_BTN_H, 4, COLOR_BTN_TEXT);
+
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_BTN_TEXT, btnColor);
+    tft.drawString("SCAN", WIFI_SCAN_BTN_X + WIFI_SCAN_BTN_W / 2, y + WIFI_SCAN_BTN_H / 2);
+}
+
+static bool isTouchInWifiScanButton(int16_t x, int16_t y) {
+    int16_t btnY = WIFI_CONTENT_Y + WIFI_SCAN_BTN_Y;
+    return (x >= WIFI_SCAN_BTN_X && x <= WIFI_SCAN_BTN_X + WIFI_SCAN_BTN_W &&
+            y >= btnY && y <= btnY + WIFI_SCAN_BTN_H);
+}
+
+static void drawWifiScreen() {
+    tft.fillScreen(COLOR_BACKGROUND);
+
+    // Back button (top left, header-sized)
+    drawWifiBackButton(false);
+
+    // Title (centered, accounting for back button)
+    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextSize(2);
+    tft.drawString("WIFI SETTINGS", SCREEN_WIDTH / 2 + 20, 10);
+
+    // Draw horizontal line
+    tft.drawLine(20, 35, SCREEN_WIDTH - 20, 35, COLOR_LABEL);
+
+    // Draw content
+    drawWifiScreenContent();
+
+    // WiFi status indicator
+    drawWifiStatusIndicator();
+}
+
 static void clearFileList() {
     for (int i = 0; i < fileCount; i++) {
         if (fileList[i]) {
@@ -325,10 +1079,10 @@ static void loadFileList() {
 
     if (!sdCardPresent()) return;
 
-    File root = SD_MMC.open("/");
+    fs::File root = SD_MMC.open("/");
     if (!root || !root.isDirectory()) return;
 
-    File file = root.openNextFile();
+    fs::File file = root.openNextFile();
     while (file && fileCount < MAX_FILES) {
         // Allocate and copy filename
         const char* name = file.name();
@@ -348,8 +1102,16 @@ static void loadFileList() {
 }
 
 static void drawFileListArea() {
-    // Clear file list area
-    tft.fillRect(0, FILE_LIST_Y_START, SCREEN_WIDTH, FILE_LIST_Y_END - FILE_LIST_Y_START, COLOR_BACKGROUND);
+    // Define box margins
+    const int16_t boxMargin = 8;
+    const int16_t boxX = boxMargin;
+    const int16_t boxY = FILE_LIST_Y_START - 4;
+    const int16_t boxW = SCREEN_WIDTH - (boxMargin * 2);
+    const int16_t boxH = FILE_LIST_Y_END - FILE_LIST_Y_START + 8;
+
+    // Clear and draw box
+    tft.fillRect(boxX, boxY, boxW, boxH, COLOR_BACKGROUND);
+    tft.drawRect(boxX, boxY, boxW, boxH, COLOR_BTN_TEXT);
 
     if (!sdCardPresent()) {
         tft.setTextDatum(MC_DATUM);
@@ -376,10 +1138,10 @@ static void drawFileListArea() {
             // Directory entries start with /
             if (fileList[i][0] == '/') {
                 tft.setTextColor(COLOR_CONNECTED, COLOR_BACKGROUND);
-                tft.drawString(fileList[i], 10, y);
+                tft.drawString(fileList[i], boxX + 6, y);
             } else {
                 tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-                tft.drawString(fileList[i], 10, y);
+                tft.drawString(fileList[i], boxX + 6, y);
             }
         }
         y += FILE_LINE_HEIGHT;
@@ -387,12 +1149,14 @@ static void drawFileListArea() {
 
     // Draw scroll indicator if needed
     if (fileCount > MAX_VISIBLE_FILES) {
-        int16_t scrollBarHeight = FILE_LIST_Y_END - FILE_LIST_Y_START;
+        int16_t scrollBarX = boxX + boxW - 8;
+        int16_t scrollBarHeight = boxH - 8;
         int16_t thumbHeight = (MAX_VISIBLE_FILES * scrollBarHeight) / fileCount;
-        int16_t thumbY = FILE_LIST_Y_START + (scrollOffset * scrollBarHeight) / fileCount;
+        if (thumbHeight < 10) thumbHeight = 10;
+        int16_t thumbY = boxY + 4 + (scrollOffset * (scrollBarHeight - thumbHeight)) / (fileCount - MAX_VISIBLE_FILES);
 
-        tft.fillRect(SCREEN_WIDTH - 6, FILE_LIST_Y_START, 4, scrollBarHeight, COLOR_BTN_NORMAL);
-        tft.fillRect(SCREEN_WIDTH - 6, thumbY, 4, thumbHeight, COLOR_BTN_TEXT);
+        tft.fillRect(scrollBarX, boxY + 4, 4, scrollBarHeight, COLOR_BTN_NORMAL);
+        tft.fillRect(scrollBarX, thumbY, 4, thumbHeight, COLOR_BTN_TEXT);
     }
 }
 
@@ -414,6 +1178,119 @@ static void drawFileBrowserScreen() {
 
     // Draw back arrow button
     drawArrowButton(false);
+
+    // WiFi status indicator
+    drawWifiStatusIndicator();
+}
+
+static void drawDiagnosticsContent() {
+    // Clear content area
+    tft.fillRect(0, DIAG_CONTENT_Y, SCREEN_WIDTH, DIAG_CONTENT_H, COLOR_BACKGROUND);
+
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextSize(1);
+    int16_t baseY = DIAG_CONTENT_Y + 5;
+    int16_t lineHeight = 18;
+    char buf[64];
+
+    // Calculate visible Y position with scroll offset
+    #define DRAW_LINE(label, value, valueColor) do { \
+        int16_t screenY = baseY - diagScrollOffset; \
+        if (screenY >= DIAG_CONTENT_Y - lineHeight && screenY < DIAG_CONTENT_Y + DIAG_CONTENT_H) { \
+            tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND); \
+            tft.drawString(label, 10, screenY); \
+            tft.setTextColor(valueColor, COLOR_BACKGROUND); \
+            tft.drawString(value, 120, screenY); \
+        } \
+        baseY += lineHeight; \
+    } while(0)
+
+    #define DRAW_SEPARATOR() do { \
+        int16_t screenY = baseY - diagScrollOffset; \
+        if (screenY >= DIAG_CONTENT_Y && screenY < DIAG_CONTENT_Y + DIAG_CONTENT_H) { \
+            tft.drawLine(20, screenY, SCREEN_WIDTH - 20, screenY, COLOR_LABEL); \
+        } \
+        baseY += 8; \
+    } while(0)
+
+    // I2C Status
+    DRAW_LINE("I2C Status:", i2cIsConnected() ? "Connected" : "Disconnected",
+              i2cIsConnected() ? COLOR_CONNECTED : COLOR_DISCONNECTED);
+
+    // Valid packets
+    snprintf(buf, sizeof(buf), "%lu", i2cGetValidPacketCount());
+    DRAW_LINE("Valid Packets:", buf, COLOR_RPM_TEXT);
+
+    // Invalid packets
+    snprintf(buf, sizeof(buf), "%lu", i2cGetInvalidPacketCount());
+    DRAW_LINE("Invalid Packets:", buf, COLOR_RPM_TEXT);
+
+    // Last RPM
+    snprintf(buf, sizeof(buf), "%u", i2cGetLastRpm());
+    DRAW_LINE("Last RPM:", buf, COLOR_RPM_TEXT);
+
+    baseY += 5;
+    DRAW_SEPARATOR();
+
+    // SD Card section
+    if (sdCardPresent()) {
+        DRAW_LINE("SD Card:", sdCardType(), COLOR_CONNECTED);
+
+        snprintf(buf, sizeof(buf), "%llu MB", sdCardTotalBytes() / (1024 * 1024));
+        DRAW_LINE("Total:", buf, COLOR_RPM_TEXT);
+
+        snprintf(buf, sizeof(buf), "%llu MB", sdCardUsedBytes() / (1024 * 1024));
+        DRAW_LINE("Used:", buf, COLOR_RPM_TEXT);
+    } else {
+        DRAW_LINE("SD Card:", "Not Present", COLOR_DISCONNECTED);
+    }
+
+    baseY += 5;
+    DRAW_SEPARATOR();
+
+    // WiFi section
+    const char* modeStr = (wifiMode == 0) ? "Disabled" : "Client";
+    uint16_t modeColor = (wifiMode == 0) ? COLOR_DISCONNECTED : COLOR_CONNECTED;
+    DRAW_LINE("WiFi Mode:", modeStr, modeColor);
+
+    if (wifiMode == 1) {
+        // Client mode - show connection status
+        bool connected = (WiFi.status() == WL_CONNECTED);
+        DRAW_LINE("Status:", connected ? "Connected" : "Disconnected",
+                  connected ? COLOR_CONNECTED : COLOR_DISCONNECTED);
+
+        if (connected) {
+            DRAW_LINE("SSID:", wifiSsid, COLOR_RPM_TEXT);
+
+            IPAddress ip = WiFi.localIP();
+            snprintf(buf, sizeof(buf), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+            DRAW_LINE("IP Address:", buf, COLOR_RPM_TEXT);
+
+            snprintf(buf, sizeof(buf), "%d dBm", WiFi.RSSI());
+            DRAW_LINE("Signal:", buf, COLOR_RPM_TEXT);
+        } else if (strlen(wifiSsid) > 0) {
+            DRAW_LINE("SSID:", wifiSsid, COLOR_WARNING);
+            DRAW_LINE("Status:", "Connecting...", COLOR_WARNING);
+        }
+    }
+
+    #undef DRAW_LINE
+    #undef DRAW_SEPARATOR
+
+    // Draw scroll indicator if content overflows
+    int totalHeight = baseY - (DIAG_CONTENT_Y + 5);
+    int maxScroll = totalHeight - DIAG_CONTENT_H;
+    if (maxScroll > 0) {
+        int16_t scrollBarX = SCREEN_WIDTH - 8;
+        int16_t scrollBarY = DIAG_CONTENT_Y;
+        int16_t scrollBarH = DIAG_CONTENT_H;
+        int16_t thumbH = (DIAG_CONTENT_H * DIAG_CONTENT_H) / totalHeight;
+        if (thumbH < 20) thumbH = 20;
+        int16_t thumbY = scrollBarY + (diagScrollOffset * (scrollBarH - thumbH)) / maxScroll;
+
+        tft.fillRect(scrollBarX, scrollBarY, 4, scrollBarH, COLOR_BTN_NORMAL);
+        tft.fillRect(scrollBarX, thumbY, 4, thumbH, COLOR_BTN_TEXT);
+    }
 }
 
 static void drawDiagnosticsScreen() {
@@ -428,86 +1305,32 @@ static void drawDiagnosticsScreen() {
     // Draw horizontal line
     tft.drawLine(20, 35, SCREEN_WIDTH - 20, 35, COLOR_LABEL);
 
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextSize(1);
-    int16_t y = 45;
-    int16_t lineHeight = 18;
-
-    // I2C Status
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString("I2C Status:", 10, y);
-    tft.setTextColor(i2cIsConnected() ? COLOR_CONNECTED : COLOR_DISCONNECTED, COLOR_BACKGROUND);
-    tft.drawString(i2cIsConnected() ? "Connected" : "Disconnected", 120, y);
-    y += lineHeight;
-
-    // Valid packets
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString("Valid Packets:", 10, y);
-    tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%lu", i2cGetValidPacketCount());
-    tft.drawString(buf, 120, y);
-    y += lineHeight;
-
-    // Invalid packets
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString("Invalid Packets:", 10, y);
-    tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-    snprintf(buf, sizeof(buf), "%lu", i2cGetInvalidPacketCount());
-    tft.drawString(buf, 120, y);
-    y += lineHeight;
-
-    // Last RPM
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString("Last RPM:", 10, y);
-    tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-    snprintf(buf, sizeof(buf), "%u", i2cGetLastRpm());
-    tft.drawString(buf, 120, y);
-    y += lineHeight + 5;
-
-    // SD Card section
-    tft.drawLine(20, y, SCREEN_WIDTH - 20, y, COLOR_LABEL);
-    y += 8;
-
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString("SD Card:", 10, y);
-    if (sdCardPresent()) {
-        tft.setTextColor(COLOR_CONNECTED, COLOR_BACKGROUND);
-        tft.drawString(sdCardType(), 120, y);
-        y += lineHeight;
-
-        tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-        tft.drawString("Total:", 10, y);
-        tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-        snprintf(buf, sizeof(buf), "%llu MB", sdCardTotalBytes() / (1024 * 1024));
-        tft.drawString(buf, 120, y);
-        y += lineHeight;
-
-        tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-        tft.drawString("Used:", 10, y);
-        tft.setTextColor(COLOR_RPM_TEXT, COLOR_BACKGROUND);
-        snprintf(buf, sizeof(buf), "%llu MB", sdCardUsedBytes() / (1024 * 1024));
-        tft.drawString(buf, 120, y);
-    } else {
-        tft.setTextColor(COLOR_DISCONNECTED, COLOR_BACKGROUND);
-        tft.drawString("Not Present", 120, y);
-    }
+    // Draw scrollable content
+    drawDiagnosticsContent();
 
     // Draw back button (center)
     drawBackButton(false);
+
+    // Draw WiFi button (bottom left)
+    drawWifiButton(false);
 
     // Draw SD card button (bottom right) - only if SD card present
     if (sdCardPresent()) {
         drawSdButton(false);
     }
+
+    // WiFi status indicator
+    drawWifiStatusIndicator();
 }
 
 static void drawMainScreen() {
     drawBackground();
     drawRpmValue(displayedRpm, currentState == DISPLAY_CONNECTED);
     drawStatusIndicator(currentState == DISPLAY_CONNECTED);
-    drawTestButton(testButtonPressed);
+    drawVonderwagen3DLogo();
     drawGearButton(gearButtonPressed);
+    drawModeButton(modeButtonPressed);
+    drawWifiStatusIndicator();
 }
 
 static void switchToScreen(ScreenType screen) {
@@ -516,6 +1339,10 @@ static void switchToScreen(ScreenType screen) {
         drawMainScreen();
     } else if (screen == SCREEN_DIAGNOSTICS) {
         drawDiagnosticsScreen();
+    } else if (screen == SCREEN_FILE_BROWSER) {
+        drawFileBrowserScreen();
+    } else if (screen == SCREEN_WIFI) {
+        drawWifiScreen();
     }
 }
 
@@ -572,12 +1399,27 @@ bool displayInit() {
         // Continue without touch - not critical
     }
 
+    // Load WiFi settings from NVS
+    loadWifiSettings();
+    Serial.printf("WiFi mode loaded: %s\n", getWifiModeString());
+
+    // Initialize WiFi based on saved mode
+    if (wifiMode == 0) {
+        WiFi.mode(WIFI_OFF);
+    } else if (wifiMode == 1) {
+        WiFi.mode(WIFI_STA);
+        if (strlen(wifiSsid) > 0) {
+            WiFi.begin(wifiSsid, wifiPassword);
+        }
+    }
+
     // Draw initial screen
     drawBackground();
     drawRpmValue(0, false);
     drawStatusIndicator(false);
-    drawTestButton(false);
+    drawVonderwagen3DLogo();
     drawGearButton(false);
+    drawModeButton(false);
     needsFullRedraw = false;
 
     // Switch to slave mode for RPM reception
@@ -588,12 +1430,15 @@ bool displayInit() {
 }
 
 void displayUpdateRpm(uint16_t rpm) {
-    if (rpm != displayedRpm || currentState != DISPLAY_CONNECTED) {
-        displayedRpm = rpm;
+    // In manual mode, always show 3000 RPM
+    uint16_t displayRpm = (i2cGetMode() == MODE_MANUAL) ? 3000 : rpm;
+
+    if (displayRpm != displayedRpm || currentState != DISPLAY_CONNECTED) {
+        displayedRpm = displayRpm;
         currentState = DISPLAY_CONNECTED;
         // Only update display if on main screen
         if (currentScreen == SCREEN_MAIN) {
-            drawRpmValue(rpm, true);
+            drawRpmValue(displayRpm, true);
             drawStatusIndicator(true);
         }
     }
@@ -614,6 +1459,8 @@ void displaySetConnected(bool connected) {
     }
 }
 
+static uint8_t touchFailCount = 0;
+
 bool displayGetTouch(int16_t* x, int16_t* y) {
     if (!touchInitialized) return false;
 
@@ -624,15 +1471,27 @@ bool displayGetTouch(int16_t* x, int16_t* y) {
     Wire.beginTransmission((uint8_t)FT6336G_ADDR);
     Wire.write(FT6336G_REG_STATUS);
     if (Wire.endTransmission() != 0) {
+        touchFailCount++;
+        if (touchFailCount > 20) {
+            i2cRecoverBus();
+            touchFailCount = 0;
+        }
         i2cEnableSlaveMode();
         return false;
     }
 
     Wire.requestFrom((uint8_t)FT6336G_ADDR, (uint8_t)5);  // Status + XH, XL, YH, YL
     if (Wire.available() < 5) {
+        touchFailCount++;
+        if (touchFailCount > 20) {
+            i2cRecoverBus();
+            touchFailCount = 0;
+        }
         i2cEnableSlaveMode();
         return false;
     }
+
+    touchFailCount = 0;  // Reset on success
 
     uint8_t status = Wire.read();
     uint8_t touches = status & 0x0F;
@@ -662,7 +1521,25 @@ bool displayGetTouch(int16_t* x, int16_t* y) {
     return true;
 }
 
+static unsigned long lastI2cRecoveryAttempt = 0;
+
 void displayLoop() {
+    // Check WiFi status periodically and update indicator if changed
+    if (!keyboardVisible && millis() - lastWifiStatusCheck > 1000) {
+        lastWifiStatusCheck = millis();
+        bool currentWifiConnected = (wifiMode == 1 && WiFi.status() == WL_CONNECTED);
+        if (currentWifiConnected != lastWifiConnected) {
+            lastWifiConnected = currentWifiConnected;
+            drawWifiStatusIndicator();
+        }
+    }
+
+    // If disconnected for more than 3 seconds, try I2C bus recovery periodically
+    if (!i2cIsConnected() && millis() - lastI2cRecoveryAttempt > 3000) {
+        lastI2cRecoveryAttempt = millis();
+        i2cRecoverBus();
+    }
+
     // Handle touch input
     int16_t touchX, touchY;
     bool currentTouch = displayGetTouch(&touchX, &touchY);
@@ -679,29 +1556,33 @@ void displayLoop() {
         }
 
         if (currentTouch) {
-            // Check test button
-            if (isTouchInTestButton(touchX, touchY) && !testButtonPressed) {
-                testButtonPressed = true;
-                drawTestButton(true);
-                Serial.println("TEST button pressed");
-            }
             // Check gear button
             if (isTouchInGearButton(touchX, touchY) && !gearButtonPressed) {
                 gearButtonPressed = true;
                 drawGearButton(true);
                 Serial.println("GEAR button pressed");
             }
-        } else {
-            if (testButtonPressed) {
-                testButtonPressed = false;
-                drawTestButton(false);
-                Serial.println("TEST button released");
+            // Check mode button
+            if (isTouchInModeButton(touchX, touchY) && !modeButtonPressed) {
+                modeButtonPressed = true;
+                drawModeButton(true);
+                Serial.println("MODE button pressed");
             }
+        } else {
             if (gearButtonPressed) {
                 gearButtonPressed = false;
                 // Switch to diagnostics screen on release
                 switchToScreen(SCREEN_DIAGNOSTICS);
                 Serial.println("Switching to diagnostics screen");
+            }
+            if (modeButtonPressed) {
+                modeButtonPressed = false;
+                // Toggle mode between Auto and Manual
+                uint8_t currentMode = i2cGetMode();
+                uint8_t newMode = (currentMode == MODE_AUTO) ? MODE_MANUAL : MODE_AUTO;
+                i2cSetMode(newMode);
+                drawModeButton(false);
+                Serial.printf("Mode changed to %s\n", newMode == MODE_AUTO ? "AUTO" : "MANUAL");
             }
         }
 
@@ -718,12 +1599,183 @@ void displayLoop() {
                 drawBackButton(true);
                 Serial.println("BACK button pressed");
             }
+            // Check SD card button
+            if (sdCardPresent() && isTouchInSdButton(touchX, touchY) && !sdButtonPressed) {
+                sdButtonPressed = true;
+                drawSdButton(true);
+                Serial.println("SD button pressed");
+            }
+            // Check WiFi button
+            if (isTouchInWifiButton(touchX, touchY) && !wifiButtonPressed) {
+                wifiButtonPressed = true;
+                drawWifiButton(true);
+                Serial.println("WIFI button pressed");
+            }
+            // Handle scrolling in content area
+            if (touchY >= DIAG_CONTENT_Y && touchY < DIAG_CONTENT_Y + DIAG_CONTENT_H) {
+                if (!isDragging) {
+                    isDragging = true;
+                    lastTouchY = touchY;
+                } else if (lastTouchY >= 0) {
+                    int16_t delta = lastTouchY - touchY;
+                    if (abs(delta) > 3) {
+                        int maxScroll = 80;  // Approximate max scroll for WiFi content
+                        diagScrollOffset += delta;
+                        if (diagScrollOffset < 0) diagScrollOffset = 0;
+                        if (diagScrollOffset > maxScroll) diagScrollOffset = maxScroll;
+                        drawDiagnosticsContent();
+                        lastTouchY = touchY;
+                    }
+                }
+            }
         } else {
             if (backButtonPressed) {
                 backButtonPressed = false;
+                diagScrollOffset = 0;  // Reset scroll on exit
                 // Switch back to main screen on release
                 switchToScreen(SCREEN_MAIN);
                 Serial.println("Switching to main screen");
+            }
+            if (sdButtonPressed) {
+                sdButtonPressed = false;
+                // Switch to file browser screen on release
+                switchToScreen(SCREEN_FILE_BROWSER);
+                Serial.println("Switching to file browser screen");
+            }
+            if (wifiButtonPressed) {
+                wifiButtonPressed = false;
+                // Switch to WiFi screen on release
+                switchToScreen(SCREEN_WIFI);
+                Serial.println("Switching to WiFi screen");
+            }
+            isDragging = false;
+            lastTouchY = -1;
+        }
+    } else if (currentScreen == SCREEN_FILE_BROWSER) {
+        if (currentTouch) {
+            // Check back arrow button
+            if (isTouchInArrowButton(touchX, touchY) && !arrowButtonPressed) {
+                arrowButtonPressed = true;
+                drawArrowButton(true);
+                Serial.println("ARROW button pressed");
+            }
+            // Handle scrolling in file list area
+            if (isTouchInFileList(touchX, touchY)) {
+                if (!isDragging) {
+                    isDragging = true;
+                    lastTouchY = touchY;
+                } else if (lastTouchY >= 0) {
+                    int16_t delta = lastTouchY - touchY;
+                    if (abs(delta) > 5) {  // Threshold to avoid jitter
+                        int maxScroll = fileCount - MAX_VISIBLE_FILES;
+                        if (maxScroll < 0) maxScroll = 0;
+                        scrollOffset += (delta > 0) ? 1 : -1;
+                        if (scrollOffset < 0) scrollOffset = 0;
+                        if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+                        drawFileListArea();
+                        lastTouchY = touchY;
+                    }
+                }
+            }
+        } else {
+            if (arrowButtonPressed) {
+                arrowButtonPressed = false;
+                // Switch back to diagnostics screen on release
+                switchToScreen(SCREEN_DIAGNOSTICS);
+                Serial.println("Switching to diagnostics screen");
+            }
+            isDragging = false;
+            lastTouchY = -1;
+        }
+    } else if (currentScreen == SCREEN_WIFI) {
+        // If full-screen keyboard is visible, handle keyboard touch
+        if (keyboardVisible) {
+            if (currentTouch && !lastTouchState) {
+                handleKeyboardTouch(touchX, touchY);
+            }
+        } else {
+            if (currentTouch) {
+                // Check back button (top left)
+                if (isTouchInWifiBackButton(touchX, touchY) && !wifiBackButtonPressed) {
+                    wifiBackButtonPressed = true;
+                    drawWifiBackButton(true);
+                    Serial.println("WIFI BACK button pressed");
+                }
+
+                // Check scan button (in client mode)
+                if (wifiMode == 1 && isTouchInWifiScanButton(touchX, touchY) && !wifiScanButtonPressed) {
+                    wifiScanButtonPressed = true;
+                    drawWifiScanButton(true);
+                    Serial.println("SCAN button pressed");
+                }
+
+                // Check mode toggle button
+                if (isTouchInWifiModeButton(touchX, touchY) && !wifiModeButtonPressed) {
+                    wifiModeButtonPressed = true;
+                    drawWifiModeButton();
+                    Serial.println("MODE button pressed");
+                }
+
+                // Check SSID input - opens full-screen keyboard
+                if (isTouchInSsidInput(touchX, touchY) && !lastTouchState) {
+                    activeInput = 1;
+                    showKeyboard("SSID:", wifiSsid, MAX_SSID_LEN, false);
+                    Serial.println("SSID input selected");
+                }
+
+                // Check password input - opens full-screen keyboard
+                if (isTouchInPassInput(touchX, touchY) && !lastTouchState) {
+                    activeInput = 2;
+                    showKeyboard("Password:", wifiPassword, MAX_PASS_LEN, true);
+                    Serial.println("Password input selected");
+                }
+
+                // Check network list selection (in client mode)
+                if (wifiMode == 1) {
+                    int networkIdx;
+                    if (isTouchInWifiNetwork(touchX, touchY, &networkIdx) && !lastTouchState) {
+                        strncpy(wifiSsid, wifiNetworks[networkIdx].ssid, MAX_SSID_LEN);
+                        wifiSsid[MAX_SSID_LEN] = '\0';
+                        activeInput = 2;
+                        showKeyboard("Password:", wifiPassword, MAX_PASS_LEN, true);
+                        Serial.printf("Selected network: %s\n", wifiSsid);
+                    }
+                }
+            } else {
+                if (wifiBackButtonPressed) {
+                    wifiBackButtonPressed = false;
+                    activeInput = 0;
+                    switchToScreen(SCREEN_MAIN);
+                    Serial.println("Switching to main screen");
+                }
+                if (wifiScanButtonPressed) {
+                    wifiScanButtonPressed = false;
+                    drawWifiScanButton(false);
+                    // Perform scan
+                    scanWifiNetworks();
+                    drawWifiNetworkList();
+                    drawWifiBackButton(false);  // Ensure back button is visible
+                    Serial.println("WiFi scan complete");
+                }
+                if (wifiModeButtonPressed) {
+                    wifiModeButtonPressed = false;
+                    // Toggle WiFi mode: 0 (disabled) <-> 1 (client)
+                    wifiMode = (wifiMode == 0) ? 1 : 0;
+                    saveWifiSettings();
+
+                    // Apply WiFi mode
+                    if (wifiMode == 0) {
+                        WiFi.disconnect(true);
+                        WiFi.mode(WIFI_OFF);
+                        wifiNetworkCount = 0;
+                    } else if (wifiMode == 1) {
+                        wifiNetworkCount = 0;
+                    }
+
+                    drawWifiScreenContent();
+                    drawWifiBackButton(false);  // Ensure back button is visible
+                    Serial.printf("WiFi mode: %s\n", getWifiModeString());
+                }
             }
         }
     }

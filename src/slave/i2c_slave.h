@@ -26,4 +26,11 @@ uint32_t i2cGetInvalidPacketCount();
 void i2cEnableSlaveMode();
 void i2cEnableMasterMode();
 
+// Attempt to recover stuck I2C bus
+void i2cRecoverBus();
+
+// Mode control (Auto/Manual)
+void i2cSetMode(uint8_t mode);
+uint8_t i2cGetMode();
+
 #endif // I2C_SLAVE_H

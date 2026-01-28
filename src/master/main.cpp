@@ -1,7 +1,12 @@
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include "can_handler.h"
 #include "i2c_master.h"
 #include "shared/config.h"
+#include "shared/protocol.h"
+
+// Watchdog timeout in seconds
+#define WDT_TIMEOUT_SEC 5
 
 // Configuration - modify these after identifying the correct CAN message
 static const uint32_t RPM_CAN_ID = 0x000;     // Set after sniffing
@@ -15,75 +20,36 @@ enum OperatingMode {
     MODE_SIMULATE    // Generate simulated RPM
 };
 
-// Simulation patterns
-enum SimPattern {
-    SIM_SINE,        // Smooth sine wave
-    SIM_RAMP,        // Linear ramp up/down
-    SIM_RANDOM,      // Random values
-    SIM_STEP         // Step changes
-};
-
 // State
 static uint16_t currentRpm = 0;
 static unsigned long lastSendTime = 0;
-static OperatingMode currentMode = MODE_SNIFF;
+static OperatingMode currentMode = MODE_SIMULATE;  // Start in simulation mode
 
-// Simulation state
-static SimPattern simPattern = SIM_SINE;
-static uint16_t simMinRpm = 800;
-static uint16_t simMaxRpm = 6000;
-static uint16_t simPeriodMs = 4000;  // Full cycle period
-static unsigned long simStartTime = 0;
+// Manual mode static RPM
+#define MANUAL_STATIC_RPM 3000
 
-// Generate simulated RPM based on current pattern
-uint16_t generateSimulatedRpm() {
-    unsigned long elapsed = millis() - simStartTime;
-    float phase = (float)(elapsed % simPeriodMs) / simPeriodMs;  // 0.0 to 1.0
-    uint16_t range = simMaxRpm - simMinRpm;
+// Auto mode simulation - simple range 3500-4500
+#define SIM_MIN_RPM 3500
+#define SIM_MAX_RPM 4500
+static unsigned long lastSimChange = 0;
+static bool simGoingUp = true;
 
-    switch (simPattern) {
-        case SIM_SINE: {
-            // Smooth sine wave oscillation
-            float sineVal = (sin(phase * 2.0 * PI) + 1.0) / 2.0;  // 0.0 to 1.0
-            return simMinRpm + (uint16_t)(sineVal * range);
-        }
+// I2C communication state
+static uint16_t lastSentRpm = 0;
+static unsigned long lastKeepalive = 0;
 
-        case SIM_RAMP: {
-            // Triangle wave - ramp up then down
-            float rampVal = (phase < 0.5) ? (phase * 2.0) : (2.0 - phase * 2.0);
-            return simMinRpm + (uint16_t)(rampVal * range);
-        }
+// Timing constants
+#define SIM_CHANGE_INTERVAL_MS  1000   // Change simulated RPM every 1 second
+#define KEEPALIVE_INTERVAL_MS   2000   // Send keepalive every 2 seconds even if RPM unchanged
 
-        case SIM_RANDOM: {
-            // Random value changes every 500ms
-            static uint16_t lastRandom = simMinRpm;
-            static unsigned long lastRandomTime = 0;
-            if (millis() - lastRandomTime > 500) {
-                lastRandomTime = millis();
-                lastRandom = simMinRpm + (random(range));
-            }
-            return lastRandom;
-        }
-
-        case SIM_STEP: {
-            // Step through discrete values
-            int steps = 5;
-            int stepIndex = (int)(phase * steps) % steps;
-            return simMinRpm + (range * stepIndex / (steps - 1));
-        }
-
-        default:
-            return simMinRpm;
-    }
-}
-
-const char* getPatternName(SimPattern p) {
-    switch (p) {
-        case SIM_SINE:   return "SINE";
-        case SIM_RAMP:   return "RAMP";
-        case SIM_RANDOM: return "RANDOM";
-        case SIM_STEP:   return "STEP";
-        default:         return "UNKNOWN";
+// Generate next simulated RPM value - simple alternating between min and max
+uint16_t generateNextSimulatedRpm() {
+    if (simGoingUp) {
+        simGoingUp = false;
+        return SIM_MAX_RPM;
+    } else {
+        simGoingUp = true;
+        return SIM_MIN_RPM;
     }
 }
 
@@ -105,10 +71,6 @@ void printHelp() {
     Serial.println("  i<hex> - Set RPM message ID (e.g., i1A0)");
     Serial.println("  o<num> - Set byte offset (e.g., o2)");
     Serial.println("  t - Send test RPM (1234)");
-    Serial.println("  p<0-3> - Set sim pattern (0=sine,1=ramp,2=random,3=step)");
-    Serial.println("  n<num> - Set sim min RPM (e.g., n800)");
-    Serial.println("  x<num> - Set sim max RPM (e.g., x6000)");
-    Serial.println("  d<num> - Set sim period ms (e.g., d4000)");
     Serial.println("  c - Show statistics");
     Serial.println("  ? - Show this help");
     Serial.println();
@@ -121,11 +83,11 @@ void printStats() {
     Serial.printf("I2C Success: %lu\n", i2cGetSuccessCount());
     Serial.printf("I2C Errors: %lu\n", i2cGetErrorCount());
     Serial.printf("Current RPM: %u\n", currentRpm);
+    Serial.printf("Last Sent RPM: %u\n", lastSentRpm);
     Serial.printf("Mode: %s\n", getModeName(currentMode));
     if (currentMode == MODE_SIMULATE) {
-        Serial.printf("Sim Pattern: %s\n", getPatternName(simPattern));
-        Serial.printf("Sim Range: %u - %u RPM\n", simMinRpm, simMaxRpm);
-        Serial.printf("Sim Period: %u ms\n", simPeriodMs);
+        Serial.printf("Sim Range: %u - %u RPM\n", SIM_MIN_RPM, SIM_MAX_RPM);
+        Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
     }
     Serial.println();
 }
@@ -158,10 +120,12 @@ void processSerialCommand() {
         case 'm':
         case 'M':
             currentMode = MODE_SIMULATE;
-            simStartTime = millis();
+            lastSimChange = millis();  // Reset simulation timer
+            simGoingUp = true;         // Reset direction
+            currentRpm = SIM_MIN_RPM;  // Start at min
             Serial.println("Simulation mode enabled");
-            Serial.printf("Pattern: %s, Range: %u-%u RPM, Period: %u ms\n",
-                         getPatternName(simPattern), simMinRpm, simMaxRpm, simPeriodMs);
+            Serial.printf("Range: %u-%u RPM, Change every %d ms\n",
+                         SIM_MIN_RPM, SIM_MAX_RPM, SIM_CHANGE_INTERVAL_MS);
             break;
 
         case 'i':
@@ -179,41 +143,6 @@ void processSerialCommand() {
                 uint8_t offset = param.toInt();
                 canSetRpmExtraction(offset, RPM_SCALE);
                 Serial.printf("RPM byte offset set to %d\n", offset);
-            }
-            break;
-
-        case 'p':
-        case 'P':
-            if (param.length() > 0) {
-                int p = param.toInt();
-                if (p >= 0 && p <= 3) {
-                    simPattern = (SimPattern)p;
-                    Serial.printf("Sim pattern set to %s\n", getPatternName(simPattern));
-                }
-            }
-            break;
-
-        case 'n':
-        case 'N':
-            if (param.length() > 0) {
-                simMinRpm = param.toInt();
-                Serial.printf("Sim min RPM set to %u\n", simMinRpm);
-            }
-            break;
-
-        case 'x':
-        case 'X':
-            if (param.length() > 0) {
-                simMaxRpm = param.toInt();
-                Serial.printf("Sim max RPM set to %u\n", simMaxRpm);
-            }
-            break;
-
-        case 'd':
-        case 'D':
-            if (param.length() > 0) {
-                simPeriodMs = param.toInt();
-                Serial.printf("Sim period set to %u ms\n", simPeriodMs);
             }
             break;
 
@@ -249,7 +178,13 @@ void processSerialCommand() {
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
+
+    // Wait for USB CDC to be ready (ESP32-S3 specific) with timeout
+    unsigned long start = millis();
+    while (!Serial && (millis() - start) < 3000) {
+        delay(10);
+    }
+    delay(100);
 
     Serial.println("\n\n========================================");
     Serial.println("  ESP32-S3 CAN-to-I2C Master");
@@ -257,6 +192,11 @@ void setup() {
 
     Serial.printf("CPU Freq: %d MHz\n", getCpuFrequencyMhz());
     Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
+
+    // Initialize hardware watchdog timer
+    esp_task_wdt_init(WDT_TIMEOUT_SEC, true);  // timeout in seconds, panic on timeout
+    esp_task_wdt_add(NULL);  // Add current task to watchdog
+    Serial.printf("Watchdog enabled: %d second timeout\n", WDT_TIMEOUT_SEC);
 
     // Initialize I2C master
     if (!i2cMasterInit()) {
@@ -269,17 +209,32 @@ void setup() {
         Serial.println("Check MCP2515 wiring and power");
     }
 
-    // Start in sniff mode
+    // Configure CAN (even if starting in sim mode)
     canSetMode(CAN_MODE_SNIFF);
     canSetRpmMessageId(RPM_CAN_ID);
     canSetRpmExtraction(RPM_BYTE_OFFSET, RPM_SCALE);
 
+    // Initialize simulation and keepalive timers
+    lastSimChange = millis();
+    lastKeepalive = millis();
+    currentRpm = MANUAL_STATIC_RPM;  // Start with manual mode RPM
+    lastSentRpm = 0;  // Force initial send
+
+    Serial.println("Starting in SIMULATION mode - sending RPM over I2C");
+    Serial.printf("Simulation range: %u-%u RPM (alternates every %d ms)\n",
+                  SIM_MIN_RPM, SIM_MAX_RPM, SIM_CHANGE_INTERVAL_MS);
+    Serial.println("Slave controls display mode (Auto/Manual)");
     printHelp();
 }
 
 void loop() {
+    // Reset hardware watchdog
+    esp_task_wdt_reset();
+
     // Process serial commands
     processSerialCommand();
+
+    unsigned long now = millis();
 
     // Process based on current mode
     switch (currentMode) {
@@ -294,7 +249,7 @@ void loop() {
             if (canProcess(&rpm)) {
                 currentRpm = rpm;
             }
-            unsigned long now = millis();
+            now = millis();
             if (now - lastSendTime >= I2C_SEND_INTERVAL_MS) {
                 lastSendTime = now;
                 i2cSendRpm(currentRpm);
@@ -303,14 +258,33 @@ void loop() {
         }
 
         case MODE_SIMULATE: {
-            // Generate simulated RPM and send over I2C
-            currentRpm = generateSimulatedRpm();
-            unsigned long now = millis();
-            if (now - lastSendTime >= I2C_SEND_INTERVAL_MS) {
-                lastSendTime = now;
-                i2cSendRpm(currentRpm);
+            now = millis();
+
+            // Alternate between 3500 and 4500 every second
+            // Slave decides what to display based on its local mode setting
+            if (now - lastSimChange >= SIM_CHANGE_INTERVAL_MS) {
+                lastSimChange = now;
+                currentRpm = generateNextSimulatedRpm();
+            }
+
+            // Send I2C only if RPM changed OR keepalive interval expired
+            bool shouldSend = false;
+            if (currentRpm != lastSentRpm) {
+                shouldSend = true;  // RPM changed, send immediately
+            } else if (now - lastKeepalive >= KEEPALIVE_INTERVAL_MS) {
+                shouldSend = true;  // Keepalive - maintain connection
+            }
+
+            if (shouldSend) {
+                if (i2cSendRpm(currentRpm)) {
+                    lastSentRpm = currentRpm;
+                    lastKeepalive = now;
+                }
             }
             break;
         }
     }
+
+    // Small delay to prevent tight loop
+    delay(1);
 }
