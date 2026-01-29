@@ -257,7 +257,7 @@ void screenMainHandleTouch(int16_t x, int16_t y, bool pressed) {
         // Handle releases
         if (gearButtonPressed) {
             gearButtonPressed = false;
-            switchToScreen(SCREEN_DIAGNOSTICS);
+            switchToScreen(SCREEN_SETTINGS);
             Serial.println("Switching to settings screen");
         }
 

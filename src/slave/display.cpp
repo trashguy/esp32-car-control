@@ -29,7 +29,7 @@ void switchToScreen(ScreenType screen) {
         case SCREEN_MAIN:
             // Main screen has no reset needed
             break;
-        case SCREEN_DIAGNOSTICS:
+        case SCREEN_SETTINGS:
             screenSettingsReset();
             break;
         case SCREEN_FILE_BROWSER:
@@ -47,7 +47,7 @@ void switchToScreen(ScreenType screen) {
         case SCREEN_MAIN:
             screenMainDraw();
             break;
-        case SCREEN_DIAGNOSTICS:
+        case SCREEN_SETTINGS:
             screenSettingsDraw();
             break;
         case SCREEN_FILE_BROWSER:
@@ -145,7 +145,7 @@ void displayLoop() {
             }
             break;
 
-        case SCREEN_DIAGNOSTICS:
+        case SCREEN_SETTINGS:
             screenSettingsUpdate();
             if (currentTouch != lastTouchState || currentTouch) {
                 screenSettingsHandleTouch(touchX, touchY, currentTouch);
