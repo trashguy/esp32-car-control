@@ -1,0 +1,191 @@
+(kicad_sch
+  (version 20230121)
+  (generator "eeschema")
+  (generator_version "7.0")
+  (uuid "e63e39d7-6ac0-4ffd-8aa3-1841a4541b55")
+  (paper "A3")
+  (title_block
+    (title "ESP32-S3 Master PCB")
+    (date "2026-01-29")
+    (rev "1.0")
+    (company "ESP32 Car Control")
+    (comment 1 "Custom PCB for CAN bus reader and motor control")
+    (comment 2 "See docs/schematics/master-custom-pcb.md for details")
+  )
+
+  (lib_symbols
+    (symbol "Device:C"
+      (pin_numbers hide)
+      (pin_names (offset 0.254))
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "C" (at 0.635 2.54 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (property "Value" "C" (at 0.635 -2.54 0) (effects (font (size 1.27 1.27)) (justify left)))
+      (property "Footprint" "" (at 0.9652 -3.81 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "~" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "C_0_1"
+        (polyline (pts (xy -2.032 -0.762) (xy 2.032 -0.762)) (stroke (width 0.508) (type default)) (fill (type none)))
+        (polyline (pts (xy -2.032 0.762) (xy 2.032 0.762)) (stroke (width 0.508) (type default)) (fill (type none)))
+      )
+      (symbol "C_1_1"
+        (pin passive line (at 0 3.81 270) (length 2.794) (name "~" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 0 -3.81 90) (length 2.794) (name "~" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+      )
+    )
+    (symbol "Device:R"
+      (pin_numbers hide)
+      (pin_names (offset 0))
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "R" (at 2.032 0 90) (effects (font (size 1.27 1.27))))
+      (property "Value" "R" (at 0 0 90) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "" (at -1.778 0 90) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "~" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "R_0_1"
+        (rectangle (start -1.016 -2.54) (end 1.016 2.54) (stroke (width 0.254) (type default)) (fill (type none)))
+      )
+      (symbol "R_1_1"
+        (pin passive line (at 0 3.81 270) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 0 -3.81 90) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+      )
+    )
+    (symbol "Device:L"
+      (pin_numbers hide)
+      (pin_names (offset 1.016))
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "L" (at -1.27 0 90) (effects (font (size 1.27 1.27))))
+      (property "Value" "L" (at 1.905 0 90) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "~" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "L_0_1"
+        (arc (start 0 -2.54) (mid 0.6323 -1.905) (end 0 -1.27) (stroke (width 0) (type default)) (fill (type none)))
+        (arc (start 0 -1.27) (mid 0.6323 -0.635) (end 0 0) (stroke (width 0) (type default)) (fill (type none)))
+        (arc (start 0 0) (mid 0.6323 0.635) (end 0 1.27) (stroke (width 0) (type default)) (fill (type none)))
+        (arc (start 0 1.27) (mid 0.6323 1.905) (end 0 2.54) (stroke (width 0) (type default)) (fill (type none)))
+      )
+      (symbol "L_1_1"
+        (pin passive line (at 0 3.81 270) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 0 -3.81 90) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+      )
+    )
+    (symbol "power:GND"
+      (power)
+      (pin_numbers hide)
+      (pin_names (offset 0) hide)
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "#PWR" (at 0 -6.35 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Value" "GND" (at 0 -3.81 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "GND_0_1"
+        (polyline (pts (xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27)) (stroke (width 0) (type default)) (fill (type none)))
+      )
+      (symbol "GND_1_1"
+        (pin power_in line (at 0 0 270) (length 0) (name "GND" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      )
+    )
+    (symbol "power:+3V3"
+      (power)
+      (pin_numbers hide)
+      (pin_names (offset 0) hide)
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "#PWR" (at 0 -3.81 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Value" "+3V3" (at 0 3.556 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "+3V3_0_1"
+        (polyline (pts (xy -0.762 1.27) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+        (polyline (pts (xy 0 0) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+        (polyline (pts (xy 0 2.54) (xy 0.762 1.27)) (stroke (width 0) (type default)) (fill (type none)))
+      )
+      (symbol "+3V3_1_1"
+        (pin power_in line (at 0 0 90) (length 0) (name "+3V3" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      )
+    )
+    (symbol "power:+12V"
+      (power)
+      (pin_numbers hide)
+      (pin_names (offset 0) hide)
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "#PWR" (at 0 -3.81 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Value" "+12V" (at 0 3.556 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+      (symbol "+12V_0_1"
+        (polyline (pts (xy -0.762 1.27) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+        (polyline (pts (xy 0 0) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+        (polyline (pts (xy 0 2.54) (xy 0.762 1.27)) (stroke (width 0) (type default)) (fill (type none)))
+      )
+      (symbol "+12V_1_1"
+        (pin power_in line (at 0 0 90) (length 0) (name "+12V" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      )
+    )
+  )
+
+  ;; Text notes for schematic organization
+  (text "ESP32-S3 Master Custom PCB\n\nThis schematic requires the following symbol libraries:\n- RF_Module (ESP32-S3-WROOM-1)\n- Regulator_Switching (MP2359)\n- Amplifier_Operational (LM358)\n- Interface_CAN_LIN (MCP2515)\n- Connector (USB_C, JST connectors)\n- Device (R, C, L)\n- power (GND, +3V3, +12V)\n\nSee docs/schematics/master-custom-pcb.md for\ncomplete circuit details and BOM."
+    (exclude_from_sim no)
+    (at 25.4 25.4 0)
+    (effects (font (size 2.54 2.54)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000001")
+  )
+
+  ;; Power input section label
+  (text "POWER INPUT\n12V -> 3.3V Buck Converter"
+    (exclude_from_sim no)
+    (at 25.4 80 0)
+    (effects (font (size 2 2)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000002")
+  )
+
+  ;; ESP32 section label
+  (text "ESP32-S3-WROOM-1-N16R8\nMain Microcontroller"
+    (exclude_from_sim no)
+    (at 120 80 0)
+    (effects (font (size 2 2)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000003")
+  )
+
+  ;; CAN Bus section label
+  (text "CAN BUS INTERFACE\nMCP2515 + TJA1050"
+    (exclude_from_sim no)
+    (at 250 80 0)
+    (effects (font (size 2 2)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000004")
+  )
+
+  ;; Connectors section label
+  (text "EXTERNAL CONNECTORS\nJ1: 12V Power (Screw Terminal)\nJ2: USB-C (Native USB)\nJ3: MCP2515 Module (JST-XH 7pin)\nJ4: CAN Bus (JST-GH 4pin)\nJ5: Rotary Encoder (JST-XH 5pin)\nJ6: PWM Output (JST-PH 3pin)\nJ7: SPI Slave (JST-GH 6pin)\nJ8: Micro SD Card Slot\nJ9: Expansion Header\nJ10: JTAG Debug (ARM 10pin)\nJ11: UART Debug (6pin)"
+    (exclude_from_sim no)
+    (at 25.4 180 0)
+    (effects (font (size 1.5 1.5)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000005")
+  )
+
+  ;; Pin assignment reference
+  (text "GPIO ASSIGNMENT\n------------------\nGPIO 0: BOOT (strapping)\nGPIO 2: COMM_SPI_MOSI\nGPIO 3: COMM_SPI_MISO\nGPIO 4: ENCODER_CLK\nGPIO 5: ENCODER_DT\nGPIO 6: ENCODER_SW\nGPIO 7: PWM_OUTPUT\nGPIO 8: SD_CD\nGPIO 9: MCP2515_INT\nGPIO 10: MCP2515_CS\nGPIO 11: MCP2515_MOSI\nGPIO 12: MCP2515_SCK\nGPIO 13: MCP2515_MISO\nGPIO 14: COMM_SPI_SCK\nGPIO 15: SD_CS\nGPIO 16: SD_MOSI\nGPIO 17: SD_SCK\nGPIO 18: SD_MISO\nGPIO 19: USB_D-\nGPIO 20: USB_D+\nGPIO 21: COMM_SPI_CS\nGPIO 39: JTAG_TCK\nGPIO 40: JTAG_TDO\nGPIO 41: JTAG_TDI\nGPIO 42: JTAG_TMS\nGPIO 43: UART_TX\nGPIO 44: UART_RX"
+    (exclude_from_sim no)
+    (at 120 180 0)
+    (effects (font (size 1.27 1.27)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000006")
+  )
+
+  ;; PWM output circuit
+  (text "PWM TO ANALOG\nRC Filter + Op-Amp\nGain = 1.51 (0-5V out)"
+    (exclude_from_sim no)
+    (at 250 180 0)
+    (effects (font (size 2 2)) (justify left top))
+    (uuid "00000000-0000-0000-0000-000000000007")
+  )
+
+)

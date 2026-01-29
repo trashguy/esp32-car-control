@@ -1,0 +1,89 @@
+{
+  "description": "ESP32-S3 Master PCB Board Outline",
+  "units": "mm",
+  "board": {
+    "width": 75,
+    "height": 55,
+    "corner_radius": 2,
+    "thickness": 1.6
+  },
+  "outline_coordinates": {
+    "note": "Coordinates for Edge.Cuts layer in EasyEDA",
+    "format": "x, y pairs starting from bottom-left, counter-clockwise",
+    "points": [
+      {"x": 2, "y": 0, "type": "line_start"},
+      {"x": 73, "y": 0, "type": "line"},
+      {"x": 75, "y": 2, "type": "arc", "radius": 2},
+      {"x": 75, "y": 53, "type": "line"},
+      {"x": 73, "y": 55, "type": "arc", "radius": 2},
+      {"x": 2, "y": 55, "type": "line"},
+      {"x": 0, "y": 53, "type": "arc", "radius": 2},
+      {"x": 0, "y": 2, "type": "line"},
+      {"x": 2, "y": 0, "type": "arc", "radius": 2}
+    ]
+  },
+  "mounting_holes": {
+    "diameter": 3.2,
+    "type": "M3",
+    "positions": [
+      {"x": 5, "y": 5, "id": "H1"},
+      {"x": 70, "y": 5, "id": "H2"},
+      {"x": 5, "y": 50, "id": "H3"},
+      {"x": 70, "y": 50, "id": "H4"}
+    ]
+  },
+  "keepout_zones": [
+    {
+      "name": "ESP32_Antenna",
+      "layer": "All",
+      "type": "no_copper",
+      "coordinates": {
+        "x1": 25,
+        "y1": 38,
+        "x2": 50,
+        "y2": 53
+      },
+      "note": "Keep clear of copper on all layers for antenna performance"
+    }
+  ],
+  "component_placement_guide": {
+    "U1_ESP32": {"x": 37.5, "y": 30, "rotation": 0, "note": "Center of board"},
+    "J2_USB": {"x": 20, "y": 52, "rotation": 180, "note": "Top edge"},
+    "J1_Power": {"x": 3, "y": 25, "rotation": 90, "note": "Left edge"},
+    "J3_MCP2515": {"x": 60, "y": 45, "rotation": 0, "note": "Near CAN connector"},
+    "J4_CAN": {"x": 72, "y": 35, "rotation": 90, "note": "Right edge"},
+    "J5_Encoder": {"x": 55, "y": 5, "rotation": 0, "note": "Bottom right"},
+    "J6_PWM": {"x": 10, "y": 5, "rotation": 0, "note": "Bottom left"},
+    "J7_SPI": {"x": 22, "y": 5, "rotation": 0, "note": "Bottom left"},
+    "J8_SD": {"x": 62, "y": 25, "rotation": 0, "note": "Right side"},
+    "J9_Expansion": {"x": 37.5, "y": 5, "rotation": 0, "note": "Bottom center"},
+    "J10_JTAG": {"x": 68, "y": 15, "rotation": 0, "note": "Right side"},
+    "J11_UART": {"x": 68, "y": 5, "rotation": 0, "note": "Bottom right"},
+    "U2_Buck": {"x": 12, "y": 35, "rotation": 0, "note": "Near power input"},
+    "U3_OpAmp": {"x": 15, "y": 15, "rotation": 0, "note": "Near PWM output"},
+    "SW1_Reset": {"x": 30, "y": 15, "rotation": 0, "note": "Accessible"},
+    "SW2_Boot": {"x": 35, "y": 15, "rotation": 0, "note": "Accessible"}
+  },
+  "layer_stackup": {
+    "layers": 2,
+    "stackup": [
+      {"name": "F.Cu", "type": "signal", "thickness_um": 35},
+      {"name": "Dielectric", "type": "core", "thickness_mm": 1.51, "material": "FR4"},
+      {"name": "B.Cu", "type": "ground_plane", "thickness_um": 35}
+    ]
+  },
+  "design_rules_jlcpcb": {
+    "min_trace_width_mm": 0.127,
+    "min_trace_spacing_mm": 0.127,
+    "min_via_diameter_mm": 0.45,
+    "min_via_drill_mm": 0.2,
+    "min_hole_diameter_mm": 0.2,
+    "min_annular_ring_mm": 0.125,
+    "min_silkscreen_width_mm": 0.15,
+    "min_silkscreen_height_mm": 0.8,
+    "recommended_trace_width_signal_mm": 0.25,
+    "recommended_trace_width_power_mm": 0.5,
+    "recommended_via_diameter_mm": 0.6,
+    "recommended_via_drill_mm": 0.3
+  }
+}

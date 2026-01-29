@@ -36,7 +36,104 @@ A dual-ESP32-S3 system for power steering RPM monitoring and display. The system
 | Rotary Encoder | KY-040 encoder for mode toggling and manual RPM adjustment |
 | Settings Persistence | Stores mode and manual RPM in NVS |
 | Full-duplex SPI | Bidirectional communication with slave device |
-| Hardware Watchdog | 5-second timeout for safety |
+| Hardware Watchdog | 2-second timeout for safety |
+| Virtual Memory | Optional SD-backed PSRAM cache for 16MB+ buffers |
+
+### Master FreeRTOS Architecture
+
+The master device uses FreeRTOS tasks with safety-critical pump control isolated at highest priority.
+
+```
+┌─────────────────┐                    ┌─────────────────┐
+│   Pump Task     │                    │  SPI Comm Task  │
+│  (Priority 10)  │                    │  (Priority 5)   │
+│                 │                    │                 │
+│  100Hz PWM out  │◄───── State ──────►│  10Hz exchange  │
+│  Watchdog feed  │       Mutex        │  Slave sync     │
+└────────┬────────┘                    └────────┬────────┘
+         │                                      │
+         │ PWM                             SPI (HSPI)
+         ▼                                      ▼
+   Pump Motors                            Slave ESP32
+```
+
+| Task | Priority | Core | Rate | Purpose |
+|------|----------|------|------|---------|
+| Pump | 10 (Max) | 1 | 100Hz | Safety-critical PWM output, watchdog |
+| SPI_Comm | 5 | 0 | 10Hz | Bidirectional slave communication |
+| UI | 3 | 1 | 50Hz | Encoder input, serial commands |
+| NVS | 1 | 0 | 1Hz | Debounced settings persistence |
+
+**Safety Features:**
+- Watchdog fed from highest-priority Pump task (2 sec timeout)
+- Failsafe mode on SPI timeout (pumps run at 78% duty)
+- RTC memory tracks crash count across resets
+- Crash log written to SD card
+
+**Serial Debug Commands:**
+- `c` - Statistics (SPI, CAN, RPM, PWM)
+- `h` - System health status
+- `T` - Task stack/state info
+- `?` - Help
+
+### Virtual Memory System (Master)
+
+The master device includes an optional virtual memory system that provides 16MB+ buffer capacity using SD card as backing store with PSRAM as a hot cache. This is useful for large data processing tasks that exceed the ESP32-S3's 8MB PSRAM.
+
+```
+┌─────────────────┐     Page Fault     ┌─────────────────┐
+│   Application   │ ──────────────────>│  PSRAM Cache    │
+│                 │<────────────────── │   (6MB, ~750    │
+│  vmem.read()    │     Cache Hit      │    pages)       │
+│  vmem.write()   │                    └────────┬────────┘
+└─────────────────┘                             │
+                                          LRU Eviction
+                                                │
+                                                ▼
+                                    ┌─────────────────┐
+                                    │   SD Card       │
+                                    │  Swap File      │
+                                    │  (32MB default) │
+                                    └─────────────────┘
+```
+
+**Configuration** (in `include/shared/config.h`):
+```cpp
+#define VIRTUAL_MEMORY              0       // Set to 1 to enable
+#define VIRTUAL_MEMORY_SIZE_MB      32      // Virtual address space
+#define VIRTUAL_MEMORY_PAGE_SIZE    8192    // 8KB pages
+#define VIRTUAL_MEMORY_CACHE_MB     6       // PSRAM cache size
+```
+
+**API Usage:**
+```cpp
+#include "master/virtual_memory.h"
+
+// Read/write to virtual addresses (0 to VIRTUAL_MEMORY_SIZE-1)
+vmem.write(0x100000, data, 1024);    // Write 1KB at 1MB offset
+vmem.read(0x100000, buffer, 1024);   // Read it back
+
+// Cache management
+vmem.flush();                         // Write dirty pages to SD
+vmem.prefetch(addr, len);            // Hint for sequential access
+
+// Performance monitoring
+vmem.printStats();                   // Print hit rate, evictions, etc.
+float rate = vmem.hitRate();         // 0.0 - 1.0 (target: >80%)
+```
+
+**Performance Characteristics:**
+| Access Type | Latency | Throughput |
+|-------------|---------|------------|
+| Cache Hit (PSRAM) | ~100ns | ~400 MB/s |
+| Cache Miss (SD read) | ~1-5ms | ~3 MB/s |
+| Write-back (SD write) | ~2-10ms | ~2 MB/s |
+
+**Best Practices:**
+- Works best with sequential or localized access patterns
+- Monitor hit rate - below 70% indicates poor locality
+- Call `vmem.flush()` before power-off to avoid data loss
+- Use `vmem.prefetch()` for known sequential reads
 
 ### Slave Device
 
@@ -52,7 +149,43 @@ A dual-ESP32-S3 system for power steering RPM monitoring and display. The system
 | SD Card Support | SDMMC interface for file storage |
 | Status Indicators | CONNECTED, SYNCED, SYNCING, NO SIGNAL states |
 
+### Slave FreeRTOS Architecture
+
+The slave device uses FreeRTOS tasks for concurrent operation, ensuring responsive SPI communication while maintaining smooth UI rendering.
+
+```
+┌─────────────────┐     Queue      ┌─────────────────┐
+│   SPI Task      │ ──────────────>│  Display Task   │
+│  (High Pri)     │  RPM/Mode      │   (Med Pri)     │
+│                 │<───────────────│                 │
+│  100Hz polling  │  UI Commands   │   ~60Hz render  │
+└─────────────────┘                └─────────────────┘
+        │                                   │
+        │ SPI3                    TFT (SPI2) + I2C
+        ▼                                   ▼
+   Master ESP32                    Display + Touch
+```
+
+| Task | Priority | Core | Rate | Purpose |
+|------|----------|------|------|---------|
+| SPI_Comm | 5 (High) | 1 | 100Hz | Master communication, packet validation |
+| Display | 3 (Med) | 1 | ~60Hz | UI rendering, touch input, animations |
+| Serial | 1 (Low) | 0 | 20Hz | Debug commands and statistics |
+
+**Inter-task Communication:**
+- `queueSpiToDisplay` - RPM/mode updates from master (SPI → Display)
+- `queueDisplayToSpi` - User commands to master (Display → SPI)
+- `mutexTft` - Protects TFT SPI access
+- `mutexI2C` - Protects touch controller I2C access
+
+**Serial Debug Commands:**
+- `c` - Show statistics (packet counts, task stack usage, heap)
+- `t` - Show task state and priorities
+- `?` - Help
+
 ## Pin Assignments
+
+**Note:** ESP32-S3-N16R8 reserves GPIO 26-32 (flash) and GPIO 33-37 (PSRAM). Do not use these pins.
 
 ### Master ESP32-S3
 
@@ -73,6 +206,15 @@ A dual-ESP32-S3 system for power steering RPM monitoring and display. The system
 | CLK | 4 | Encoder Clock/A |
 | DT | 5 | Encoder Data/B |
 | SW | 6 | Encoder Button |
+
+#### PWM Controller Interface (Analog Output)
+
+| Function | GPIO | Description |
+|----------|------|-------------|
+| PWM OUT | 7 | PWM signal for motor speed (filtered to analog) |
+
+Outputs 0-3.3V analog signal (via RC filter) to control external PWM motor controller.
+Requires op-amp circuit to amplify to 0-5V. See `docs/schematics/pwm-controller-interface.md`.
 
 #### SPI Communication to Slave (HSPI/SPI2)
 
@@ -184,19 +326,30 @@ pio run -t clean
 ```
 esp32-car-control/
 ├── include/
-│   ├── master/          # Master-specific headers
-│   ├── slave/           # Slave-specific headers
+│   ├── master/
+│   │   ├── sd_handler.h       # SD card API
+│   │   └── virtual_memory.h   # Virtual memory API (optional)
+│   ├── slave/                 # Slave-specific headers
 │   └── shared/
-│       ├── config.h     # Shared configuration
-│       └── protocol.h   # SPI protocol definitions
+│       ├── config.h           # Shared configuration
+│       └── protocol.h         # SPI protocol definitions
 ├── src/
 │   ├── master/
-│   │   ├── main.cpp         # Master entry point
-│   │   ├── can_handler.cpp  # CAN bus handling
-│   │   └── spi_master.cpp   # SPI master communication
+│   │   ├── main.cpp            # Master entry point
+│   │   ├── tasks.cpp           # FreeRTOS task management
+│   │   ├── can_handler.cpp     # CAN bus handling
+│   │   ├── spi_master.cpp      # SPI master communication
+│   │   ├── sd_handler.cpp      # SD card handling
+│   │   └── virtual_memory.cpp  # SD-backed PSRAM cache (optional)
 │   └── slave/
 │       ├── main.cpp         # Slave entry point
+│       ├── tasks.cpp        # FreeRTOS task management
 │       ├── display.cpp      # TFT display and UI
+│       ├── display_common.cpp # Shared display utilities
+│       ├── screen_main.cpp  # Main RPM screen
+│       ├── screen_settings.cpp # Diagnostics screen
+│       ├── screen_filebrowser.cpp # SD card browser
+│       ├── screen_wifi.cpp  # WiFi configuration
 │       ├── spi_slave.cpp    # SPI slave communication
 │       └── sd_card.cpp      # SD card handling
 ├── platformio.ini       # Build configuration
@@ -208,7 +361,7 @@ esp32-car-control/
 
 | Component | Model | Interface |
 |-----------|-------|-----------|
-| Microcontroller | ESP32-S3 DevKit-C-1 (x2) | - |
+| Microcontroller | ESP32-S3-N16R8 DevKitC-1 (x2) | 16MB Flash, 8MB PSRAM |
 | Display | ILI9341 320x240 TFT | SPI |
 | Touch Controller | FT6336G | I2C |
 | CAN Controller | MCP2515 | SPI |
@@ -233,7 +386,7 @@ esp32-car-control/
 | SPI Timeout | 1 second |
 | Simulation Interval | 1 second |
 | Button Debounce | 200ms |
-| Watchdog Timeout | 5 seconds |
+| Watchdog Timeout | 2 seconds |
 
 ## License
 

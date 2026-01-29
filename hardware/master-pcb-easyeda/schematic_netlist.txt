@@ -1,0 +1,155 @@
+# ESP32-S3 Master PCB - Netlist for EasyEDA
+# Format: NET_NAME: PIN1, PIN2, PIN3, ...
+# Use this to wire the schematic in EasyEDA
+
+# ============================================================================
+# POWER NETS
+# ============================================================================
+
++12V: J1.1, D1.A, U2.VIN, U3.8, D2.K
+
++3V3: U2.OUT, U1.3V3, U1.3V3_2, MCP2515.VCC, J3.1, J5.4, J7.5, J9.3V3, J10.1, J11.2, C3.1, C4.1, C5.1, C6.1, C7.1, R_EN.1, R_IO0.1, R_ENC_CLK.1, R_ENC_DT.1, R_ENC_SW.1, R_SD_CS.1, R_SD_MOSI.1, R_SD_SCK.1, R_SD_MISO.1, R_SD_CD.1
+
++5V: J6.2, U3.OUT_BUFFERED
+
+GND: J1.2, D1.K, D2.A, U2.GND, U3.4, U1.GND, U1.GND_2, U1.GND_3, MCP2515.GND, J2.GND, J3.2, J4.4, J5.5, J6.3, J7.6, J8.GND, J9.GND, J10.3, J10.5, J10.9, J11.1, C1.2, C2.2, C3.2, C4.2, C5.2, C6.2, C7.2, C8.2, C_USB.2, C_RC.2, R_GAIN_GND.2, R_CC1.2, R_CC2.2, SW1.2, SW2.2
+
+VBUS: J2.VBUS, C_USB.1
+
+# ============================================================================
+# USB INTERFACE (Native USB on ESP32-S3)
+# ============================================================================
+
+USB_DP: J2.D+, R_USB_DP.1
+USB_DP_ESP: R_USB_DP.2, U1.GPIO20
+
+USB_DM: J2.D-, R_USB_DM.1
+USB_DM_ESP: R_USB_DM.2, U1.GPIO19
+
+CC1: J2.CC1, R_CC1.1
+CC2: J2.CC2, R_CC2.1
+
+# ============================================================================
+# POWER SUPPLY (12V to 3.3V Buck Converter)
+# ============================================================================
+
+# MP2359 Buck Converter
+SW_NODE: U2.SW, L1.1
+FB_NODE: U2.FB, R_FB_TOP.2, R_FB_BOT.1
+VOUT_PRE: L1.2, C2.1, R_FB_TOP.1
+
+# Feedback divider: 33K top, 10K bottom for 3.3V output
+# Vout = 0.6V * (1 + R_TOP/R_BOT) = 0.6 * (1 + 33/10) = 2.58V
+# Adjust R_FB_TOP to 36K for exactly 3.3V: 0.6 * (1 + 36/10) = 2.76V
+# Or use 33K/10K and adjust
+
+# ============================================================================
+# MCP2515 CAN CONTROLLER (SPI1 - FSPI)
+# ============================================================================
+
+MCP_SCK: U1.GPIO12, MCP2515.SCK, J3.6
+MCP_MOSI: U1.GPIO11, MCP2515.SI, J3.5
+MCP_MISO: U1.GPIO13, MCP2515.SO, J3.4
+MCP_CS: U1.GPIO10, MCP2515.CS, J3.3
+MCP_INT: U1.GPIO9, MCP2515.INT, J3.7
+
+# CAN Bus connector (directly from MCP2515 module which includes TJA1050)
+CANH: J4.1, MCP2515.CANH
+CANL: J4.2, MCP2515.CANL
+CAN_12V: J4.3
+
+# ============================================================================
+# ROTARY ENCODER (KY-040)
+# ============================================================================
+
+ENC_CLK: U1.GPIO4, R_ENC_CLK.2, J5.1
+ENC_DT: U1.GPIO5, R_ENC_DT.2, J5.2
+ENC_SW: U1.GPIO6, R_ENC_SW.2, J5.3
+
+# ============================================================================
+# PWM OUTPUT (RC Filter + Op-Amp)
+# ============================================================================
+
+PWM_RAW: U1.GPIO7, R_RC.1
+PWM_FILTERED: R_RC.2, C_RC.1, U3.3
+PWM_AMPLIFIED: U3.1, R_FB_OPAMP.1, J6.1
+OPAMP_FB: R_FB_OPAMP.2, R_GAIN_GND.1, U3.2
+
+# Op-amp gain: 1 + (R_FB/R_GND) = 1 + (5.1K/10K) = 1.51
+# Input 0-3.3V -> Output 0-5V
+
+# ============================================================================
+# SPI SLAVE COMMUNICATION (SPI2 - HSPI)
+# ============================================================================
+
+COMM_MOSI: U1.GPIO2, J7.1
+COMM_MISO: U1.GPIO3, J7.2
+COMM_SCK: U1.GPIO14, J7.3
+COMM_CS: U1.GPIO21, J7.4
+
+# ============================================================================
+# SD CARD (SPI Mode)
+# ============================================================================
+
+SD_CS: U1.GPIO15, R_SD_CS.2, J8.CS
+SD_MOSI: U1.GPIO16, R_SD_MOSI.2, J8.MOSI
+SD_SCK: U1.GPIO17, R_SD_SCK.2, J8.SCK
+SD_MISO: U1.GPIO18, R_SD_MISO.2, J8.MISO
+SD_CD: U1.GPIO8, R_SD_CD.2, J8.CD
+
+# ============================================================================
+# JTAG DEBUG INTERFACE
+# ============================================================================
+
+JTAG_TCK: U1.GPIO39, J10.4
+JTAG_TDO: U1.GPIO40, J10.6
+JTAG_TDI: U1.GPIO41, J10.8
+JTAG_TMS: U1.GPIO42, J10.2
+
+# ============================================================================
+# UART DEBUG INTERFACE
+# ============================================================================
+
+UART_TX: U1.GPIO43, J11.3
+UART_RX: U1.GPIO44, J11.4
+
+# ============================================================================
+# BOOT/RESET CONTROL
+# ============================================================================
+
+EN: U1.EN, R_EN.2, C_EN.1, SW1.1, J10.10, J11.5
+IO0: U1.GPIO0, R_IO0.2, C_IO0.1, SW2.1, J11.6
+
+# ============================================================================
+# ACTIVE CONNECTIONS SUMMARY
+# ============================================================================
+#
+# ESP32-S3 GPIO Usage:
+# GPIO0  - Boot strapping (directly to switch and UART header)
+# GPIO2  - COMM_SPI_MOSI (to slave)
+# GPIO3  - COMM_SPI_MISO (from slave)
+# GPIO4  - Encoder CLK
+# GPIO5  - Encoder DT
+# GPIO6  - Encoder SW
+# GPIO7  - PWM output
+# GPIO8  - SD Card Detect
+# GPIO9  - MCP2515 INT
+# GPIO10 - MCP2515 CS
+# GPIO11 - MCP2515 MOSI
+# GPIO12 - MCP2515 SCK
+# GPIO13 - MCP2515 MISO
+# GPIO14 - COMM_SPI_SCK (to slave)
+# GPIO15 - SD_CS
+# GPIO16 - SD_MOSI
+# GPIO17 - SD_SCK
+# GPIO18 - SD_MISO
+# GPIO19 - USB D-
+# GPIO20 - USB D+
+# GPIO21 - COMM_SPI_CS (to slave)
+# GPIO39 - JTAG TCK
+# GPIO40 - JTAG TDO
+# GPIO41 - JTAG TDI
+# GPIO42 - JTAG TMS
+# GPIO43 - UART TX
+# GPIO44 - UART RX
+# EN     - Reset

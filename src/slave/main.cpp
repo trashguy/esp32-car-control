@@ -1,64 +1,35 @@
 #include <Arduino.h>
 #include "slave/spi_slave.h"
 #include "display.h"
+#include "tasks.h"
 #include "sd_card.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 
-// State
-static volatile bool newDataAvailable = false;
-static volatile uint16_t latestRpm = 0;
-static volatile uint8_t latestMode = MODE_AUTO;
+// =============================================================================
+// FreeRTOS Task-Based Architecture
+// =============================================================================
+//
+// This slave device uses FreeRTOS tasks for concurrent operation:
+//
+// Task           Priority  Core  Purpose
+// ------------   --------  ----  ----------------------------------------
+// SPI_Comm       5 (High)  1     Master communication (100Hz)
+// Display        3 (Med)   1     UI rendering and touch (~60Hz)
+// Serial         1 (Low)   0     Debug commands
+//
+// Inter-task communication:
+// - queueSpiToDisplay: RPM/mode updates from master
+// - queueDisplayToSpi: User commands to master
+//
+// The Arduino loop() is not used - all work happens in tasks.
+// =============================================================================
 
 // Callback when data is received from master via SPI
-void onMasterData(uint16_t rpm, uint8_t mode) {
-    // Flag as new if anything changed
-    if (rpm != latestRpm || mode != latestMode) {
-        latestRpm = rpm;
-        latestMode = mode;
-        newDataAvailable = true;
-    }
-}
-
-void printStats() {
-    Serial.println("\n=== Slave Statistics ===");
-    Serial.printf("Valid packets: %lu\n", spiSlaveGetValidPacketCount());
-    Serial.printf("Invalid packets: %lu\n", spiSlaveGetInvalidPacketCount());
-    Serial.printf("Last RPM from master: %u\n", spiSlaveGetLastRpm());
-    Serial.printf("Master mode: %s\n", spiSlaveGetMasterMode() == MODE_AUTO ? "AUTO" : "MANUAL");
-    Serial.printf("Connected: %s\n", spiSlaveIsConnected() ? "YES" : "NO");
-    Serial.printf("Time since last packet: %lu ms\n", spiSlaveGetTimeSinceLastPacket());
-    Serial.printf("Requested mode: %s\n", spiSlaveGetRequestedMode() == MODE_AUTO ? "AUTO" : "MANUAL");
-    Serial.printf("Requested RPM: %u\n", spiSlaveGetRequestedRpm());
-    Serial.println();
-}
-
-void processSerialCommand() {
-    if (!Serial.available()) return;
-
-    char cmd = Serial.read();
-    // Drain any remaining characters
-    while (Serial.available()) Serial.read();
-
-    switch (cmd) {
-        case 'c':
-        case 'C':
-            printStats();
-            break;
-
-        case '?':
-        case 'h':
-        case 'H':
-            Serial.println("\n=== SPI Display Slave ===");
-            Serial.println("Commands:");
-            Serial.println("  c - Show statistics");
-            Serial.println("  ? - Show this help");
-            Serial.println();
-            break;
-
-        default:
-            break;
-    }
+// Note: This runs in the context of spiSlaveProcess(), which is called from SPI task
+static void onMasterData(uint16_t rpm, uint8_t mode) {
+    // Data handling is now done in the SPI task via queues
+    // This callback is kept for compatibility but the task handles updates
 }
 
 void setup() {
@@ -66,11 +37,18 @@ void setup() {
     delay(1000);
 
     Serial.println("\n\n========================================");
-    Serial.println("  ESP32-S3 SPI Display Slave");
+    Serial.println("  ESP32-S3 SPI Display Slave (FreeRTOS)");
     Serial.println("========================================\n");
 
     Serial.printf("CPU Freq: %d MHz\n", getCpuFrequencyMhz());
     Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("Cores available: %d\n", ESP.getChipCores());
+
+    // Initialize FreeRTOS objects (queues, mutexes)
+    if (!tasksInit()) {
+        Serial.println("FATAL: Failed to initialize FreeRTOS objects!");
+        while (1) delay(1000);
+    }
 
     // Initialize SD card first (before display takes SPI)
     if (!sdCardInit()) {
@@ -87,36 +65,20 @@ void setup() {
         Serial.println("SPI slave initialization failed!");
     }
 
-    Serial.println("\nSlave ready. Master is source of truth.\n");
+    Serial.println("\nHardware initialized. Starting FreeRTOS tasks...\n");
+
+    // Start all tasks
+    if (!tasksStart()) {
+        Serial.println("FATAL: Failed to start tasks!");
+        while (1) delay(1000);
+    }
+
+    Serial.println("All tasks started. Slave ready.\n");
+    Serial.println("Commands: 'c' = stats, 't' = task info, '?' = help\n");
 }
 
 void loop() {
-    // Process serial commands
-    processSerialCommand();
-
-    // Process SPI slave transactions
-    spiSlaveProcess();
-
-    // Check if we just reconnected - force display refresh even if values unchanged
-    if (spiSlaveCheckReconnected()) {
-        latestRpm = spiSlaveGetLastRpm();
-        latestMode = spiSlaveGetMasterMode();
-        newDataAvailable = true;
-    }
-
-    // Update display with data from master
-    if (newDataAvailable) {
-        newDataAvailable = false;
-        displayUpdateRpm(latestRpm);
-    }
-
-    // Check connection status
-    bool connected = spiSlaveIsConnected();
-    displaySetConnected(connected);
-
-    // Process display animations
-    displayLoop();
-
-    // Small delay to prevent busy-looping
-    delay(1);
+    // All work is done in FreeRTOS tasks
+    // This loop runs at lowest priority and just yields
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
