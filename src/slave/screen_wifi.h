@@ -43,15 +43,6 @@
 #define WIFI_BACK_BTN_W     50
 #define WIFI_BACK_BTN_H     26
 
-// Keyboard layout
-#define KB_HEADER_H         45
-#define KB_KEY_H            36
-#define KB_KEY_W            30
-#define KB_WIDE_KEY_W       45
-#define KB_SPACE_W          120
-#define KB_SPACING          2
-#define KB_START_Y          (KB_HEADER_H + 5)
-
 // =============================================================================
 // WiFi Screen Functions
 // =============================================================================

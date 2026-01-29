@@ -1,8 +1,8 @@
 #include "screen_wifi.h"
+#include "keyboard.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Preferences.h>
-#include <ctype.h>
 #include <string.h>
 
 // =============================================================================
@@ -33,26 +33,6 @@ static bool wifiBackButtonPressed = false;
 static bool wifiModeButtonPressed = false;
 static bool wifiScanButtonPressed = false;
 static bool lastTouchState = false;
-
-// Keyboard state
-static bool keyboardVisible = false;
-static bool keyboardShift = false;
-static bool keyboardSymbols = false;
-static char* keyboardTarget = nullptr;
-static int keyboardTargetMax = 0;
-static const char* keyboardLabel = "";
-static bool keyboardIsPassword = false;
-
-// QWERTY keyboard layouts
-static const char* kbRowLetters[] = {
-    "qwertyuiop",
-    "asdfghjkl",
-    "zxcvbnm"
-};
-static const char* kbRowNumbers = "1234567890";
-static const char* kbRowSymbols1 = "!@#$%^&*()";
-static const char* kbRowSymbols2 = "-_=+[]{}";
-static const char* kbRowSymbols3 = ";:'\",.?/";
 
 // =============================================================================
 // Helper Functions
@@ -264,281 +244,15 @@ static void drawWifiScreenContent() {
 }
 
 // =============================================================================
-// Keyboard Functions
+// Keyboard Callback
 // =============================================================================
 
-static void drawKeyboardKey(int16_t x, int16_t y, int16_t w, const char* label, uint16_t color) {
-    TFT_eSPI& tft = getTft();
-    tft.fillRoundRect(x, y, w, KB_KEY_H, 4, color);
-    tft.drawRoundRect(x, y, w, KB_KEY_H, 4, COLOR_BTN_TEXT);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(2);
-    tft.setTextColor(COLOR_BTN_TEXT, color);
-    tft.drawString(label, x + w / 2, y + KB_KEY_H / 2);
-}
-
-static void drawKeyboard() {
-    if (!keyboardVisible) return;
-
-    TFT_eSPI& tft = getTft();
-    tft.fillScreen(COLOR_KB_BG);
-
-    // Header
-    tft.fillRect(0, 0, SCREEN_WIDTH, KB_HEADER_H, COLOR_BACKGROUND);
-    tft.drawLine(0, KB_HEADER_H, SCREEN_WIDTH, KB_HEADER_H, COLOR_BTN_TEXT);
-
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextSize(1);
-    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
-    tft.drawString(keyboardLabel, 10, 5);
-
-    // Input box
-    tft.fillRoundRect(5, 18, SCREEN_WIDTH - 10, 24, 4, COLOR_BTN_NORMAL);
-    tft.drawRoundRect(5, 18, SCREEN_WIDTH - 10, 24, 4, COLOR_CONNECTED);
-
-    tft.setTextDatum(ML_DATUM);
-    tft.setTextSize(2);
-    tft.setTextColor(COLOR_RPM_TEXT, COLOR_BTN_NORMAL);
-
-    if (keyboardTarget) {
-        if (keyboardIsPassword && strlen(keyboardTarget) > 0) {
-            char masked[MAX_PASS_LEN + 1];
-            int len = strlen(keyboardTarget);
-            for (int i = 0; i < len && i < MAX_PASS_LEN; i++) masked[i] = '*';
-            masked[len] = '\0';
-            tft.drawString(masked, 12, 30);
-        } else {
-            tft.drawString(keyboardTarget, 12, 30);
-        }
-    }
-
-    int16_t y = KB_START_Y;
-    int16_t x;
-    char keyStr[2] = {0, 0};
-
-    // Row 1: Numbers or symbols
-    const char* row1 = keyboardSymbols ? kbRowSymbols1 : kbRowNumbers;
-    x = 2;
-    for (int i = 0; i < 10; i++) {
-        keyStr[0] = row1[i];
-        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
-        x += KB_KEY_W + KB_SPACING;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 2: QWERTYUIOP or symbols
-    const char* row2 = keyboardSymbols ? kbRowSymbols2 : kbRowLetters[0];
-    int row2len = strlen(row2);
-    x = (SCREEN_WIDTH - (row2len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
-    for (int i = 0; i < row2len; i++) {
-        keyStr[0] = row2[i];
-        if (!keyboardSymbols && keyboardShift) keyStr[0] = toupper(keyStr[0]);
-        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
-        x += KB_KEY_W + KB_SPACING;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 3: ASDFGHJKL or symbols
-    const char* row3 = keyboardSymbols ? kbRowSymbols3 : kbRowLetters[1];
-    int row3len = strlen(row3);
-    x = (SCREEN_WIDTH - (row3len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
-    for (int i = 0; i < row3len; i++) {
-        keyStr[0] = row3[i];
-        if (!keyboardSymbols && keyboardShift) keyStr[0] = toupper(keyStr[0]);
-        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
-        x += KB_KEY_W + KB_SPACING;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 4: SHIFT + ZXCVBNM + DEL
-    x = 2;
-    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "SHIFT", keyboardShift ? COLOR_CONNECTED : COLOR_BTN_NORMAL);
-    x += KB_WIDE_KEY_W + KB_SPACING;
-
-    const char* row4 = kbRowLetters[2];
-    for (int i = 0; i < 7; i++) {
-        keyStr[0] = row4[i];
-        if (keyboardShift) keyStr[0] = toupper(keyStr[0]);
-        drawKeyboardKey(x, y, KB_KEY_W, keyStr, COLOR_BTN_NORMAL);
-        x += KB_KEY_W + KB_SPACING;
-    }
-    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "DEL", COLOR_DISCONNECTED);
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 5: ?123 + SPACE + . + OK + BACK
-    x = 2;
-    drawKeyboardKey(x, y, KB_WIDE_KEY_W, keyboardSymbols ? "ABC" : "?123", COLOR_BTN_NORMAL);
-    x += KB_WIDE_KEY_W + KB_SPACING;
-
-    drawKeyboardKey(x, y, KB_SPACE_W, "SPACE", COLOR_BTN_NORMAL);
-    x += KB_SPACE_W + KB_SPACING;
-
-    drawKeyboardKey(x, y, KB_KEY_W, ".", COLOR_BTN_NORMAL);
-    x += KB_KEY_W + KB_SPACING;
-
-    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "OK", COLOR_CONNECTED);
-    x += KB_WIDE_KEY_W + KB_SPACING;
-
-    drawKeyboardKey(x, y, KB_WIDE_KEY_W, "BACK", COLOR_WARNING);
-}
-
-static void showKeyboard(const char* label, char* target, int maxLen, bool isPassword) {
-    keyboardLabel = label;
-    keyboardTarget = target;
-    keyboardTargetMax = maxLen;
-    keyboardIsPassword = isPassword;
-    keyboardShift = false;
-    keyboardSymbols = false;
-    keyboardVisible = true;
-    drawKeyboard();
-}
-
-static void hideKeyboard(bool save) {
-    keyboardVisible = false;
-    keyboardTarget = nullptr;
+static void onKeyboardClose(bool save) {
     if (save) {
         saveWifiSettings();
         connectToWifi();
     }
-}
-
-static void keyboardAddChar(char c) {
-    if (!keyboardTarget) return;
-    int len = strlen(keyboardTarget);
-    if (len < keyboardTargetMax) {
-        keyboardTarget[len] = c;
-        keyboardTarget[len + 1] = '\0';
-    }
-}
-
-static void keyboardDeleteChar() {
-    if (!keyboardTarget) return;
-    int len = strlen(keyboardTarget);
-    if (len > 0) {
-        keyboardTarget[len - 1] = '\0';
-    }
-}
-
-static void handleKeyboardTouch(int16_t touchX, int16_t touchY) {
-    if (!keyboardVisible) return;
-
-    int16_t y = KB_START_Y;
-
-    // Row 1: Numbers/symbols
-    if (touchY >= y && touchY < y + KB_KEY_H) {
-        const char* row1 = keyboardSymbols ? kbRowSymbols1 : kbRowNumbers;
-        int col = (touchX - 2) / (KB_KEY_W + KB_SPACING);
-        if (col >= 0 && col < 10) {
-            keyboardAddChar(row1[col]);
-            drawKeyboard();
-        }
-        return;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 2
-    if (touchY >= y && touchY < y + KB_KEY_H) {
-        const char* row2 = keyboardSymbols ? kbRowSymbols2 : kbRowLetters[0];
-        int row2len = strlen(row2);
-        int16_t startX = (SCREEN_WIDTH - (row2len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
-        int col = (touchX - startX) / (KB_KEY_W + KB_SPACING);
-        if (col >= 0 && col < row2len) {
-            char c = row2[col];
-            if (!keyboardSymbols && keyboardShift) c = toupper(c);
-            keyboardAddChar(c);
-            if (keyboardShift) keyboardShift = false;
-            drawKeyboard();
-        }
-        return;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 3
-    if (touchY >= y && touchY < y + KB_KEY_H) {
-        const char* row3 = keyboardSymbols ? kbRowSymbols3 : kbRowLetters[1];
-        int row3len = strlen(row3);
-        int16_t startX = (SCREEN_WIDTH - (row3len * (KB_KEY_W + KB_SPACING) - KB_SPACING)) / 2;
-        int col = (touchX - startX) / (KB_KEY_W + KB_SPACING);
-        if (col >= 0 && col < row3len) {
-            char c = row3[col];
-            if (!keyboardSymbols && keyboardShift) c = toupper(c);
-            keyboardAddChar(c);
-            if (keyboardShift) keyboardShift = false;
-            drawKeyboard();
-        }
-        return;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 4: SHIFT + ZXCVBNM + DEL
-    if (touchY >= y && touchY < y + KB_KEY_H) {
-        int16_t x = 2;
-        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
-            keyboardShift = !keyboardShift;
-            drawKeyboard();
-            return;
-        }
-        x += KB_WIDE_KEY_W + KB_SPACING;
-
-        for (int i = 0; i < 7; i++) {
-            if (touchX >= x && touchX < x + KB_KEY_W) {
-                char c = kbRowLetters[2][i];
-                if (keyboardShift) c = toupper(c);
-                keyboardAddChar(c);
-                if (keyboardShift) keyboardShift = false;
-                drawKeyboard();
-                return;
-            }
-            x += KB_KEY_W + KB_SPACING;
-        }
-
-        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
-            keyboardDeleteChar();
-            drawKeyboard();
-            return;
-        }
-        return;
-    }
-    y += KB_KEY_H + KB_SPACING;
-
-    // Row 5: ?123 + SPACE + . + OK + BACK
-    if (touchY >= y && touchY < y + KB_KEY_H) {
-        int16_t x = 2;
-
-        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
-            keyboardSymbols = !keyboardSymbols;
-            drawKeyboard();
-            return;
-        }
-        x += KB_WIDE_KEY_W + KB_SPACING;
-
-        if (touchX >= x && touchX < x + KB_SPACE_W) {
-            keyboardAddChar(' ');
-            drawKeyboard();
-            return;
-        }
-        x += KB_SPACE_W + KB_SPACING;
-
-        if (touchX >= x && touchX < x + KB_KEY_W) {
-            keyboardAddChar('.');
-            drawKeyboard();
-            return;
-        }
-        x += KB_KEY_W + KB_SPACING;
-
-        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
-            hideKeyboard(true);
-            switchToScreen(SCREEN_WIFI);
-            return;
-        }
-        x += KB_WIDE_KEY_W + KB_SPACING;
-
-        if (touchX >= x && touchX < x + KB_WIDE_KEY_W) {
-            hideKeyboard(false);
-            switchToScreen(SCREEN_WIFI);
-            return;
-        }
-    }
+    switchToScreen(SCREEN_WIFI);
 }
 
 // =============================================================================
@@ -617,9 +331,9 @@ void screenWifiDraw() {
 }
 
 void screenWifiHandleTouch(int16_t x, int16_t y, bool pressed) {
-    if (keyboardVisible) {
+    if (keyboardIsVisible()) {
         if (pressed && !lastTouchState) {
-            handleKeyboardTouch(x, y);
+            keyboardHandleTouch(x, y);
         }
         lastTouchState = pressed;
         return;
@@ -651,14 +365,14 @@ void screenWifiHandleTouch(int16_t x, int16_t y, bool pressed) {
         // SSID input
         if (isTouchInSsidInput(x, y) && !lastTouchState) {
             activeInput = 1;
-            showKeyboard("SSID:", wifiSsid, MAX_SSID_LEN, false);
+            keyboardShow("SSID:", wifiSsid, MAX_SSID_LEN, false, onKeyboardClose);
             Serial.println("SSID input selected");
         }
 
         // Password input
         if (isTouchInPassInput(x, y) && !lastTouchState) {
             activeInput = 2;
-            showKeyboard("Password:", wifiPassword, MAX_PASS_LEN, true);
+            keyboardShow("Password:", wifiPassword, MAX_PASS_LEN, true, onKeyboardClose);
             Serial.println("Password input selected");
         }
 
@@ -669,7 +383,7 @@ void screenWifiHandleTouch(int16_t x, int16_t y, bool pressed) {
                 strncpy(wifiSsid, wifiNetworks[networkIdx].ssid, MAX_SSID_LEN);
                 wifiSsid[MAX_SSID_LEN] = '\0';
                 activeInput = 2;
-                showKeyboard("Password:", wifiPassword, MAX_PASS_LEN, true);
+                keyboardShow("Password:", wifiPassword, MAX_PASS_LEN, true, onKeyboardClose);
                 Serial.printf("Selected network: %s\n", wifiSsid);
             }
         }
@@ -723,11 +437,11 @@ void screenWifiReset() {
     wifiScanButtonPressed = false;
     lastTouchState = false;
 
-    if (keyboardVisible) {
-        hideKeyboard(false);
+    if (keyboardIsVisible()) {
+        keyboardHide(false);
     }
 }
 
 bool screenWifiKeyboardVisible() {
-    return keyboardVisible;
+    return keyboardIsVisible();
 }
