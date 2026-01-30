@@ -10,9 +10,12 @@ This schematic replaces the ESP32-S3-DevKitC-1 with a custom PCB featuring:
 - 12V automotive input with efficient power regulation
 - Integrated CAN bus transceiver (replaces MCP2515 module)
 - On-board PWM-to-analog conversion circuit
-- Rotary encoder interface
+- MCP23017 I2C GPIO expander for up to 5 rotary encoders
+- Dedicated power steering speed control encoder
 - SPI connector for slave communication
 - Micro SD card slot for data logging
+- 12V RPM input with optocoupler isolation for engine tachometer signal
+- Vehicle Speed Sensor (VSS) input with LM1815 VR sensor interface for GM 700R4 transmission
 
 ## Connector Summary
 
@@ -24,44 +27,65 @@ All external peripheral connections use locking cable connectors for reliable au
 | J2 | USB-C Receptacle | - | Programming/Debug (Native USB) |
 | J3 | JST-XH 7-pin | 7 | MCP2515 CAN Module |
 | J4 | JST-GH 4-pin | 4 | CAN Bus (CANH/CANL/12V/GND) |
-| J5 | JST-XH 5-pin | 5 | Rotary Encoder |
 | J6 | JST-PH 3-pin | 3 | PWM Output (SIG/5V/GND) |
 | J7 | JST-GH 6-pin | 6 | SPI Slave Communication |
 | J8 | Micro SD Slot | - | SD Card Storage |
 | J9 | Pin Header 2×7 | 14 | Expansion GPIOs |
 | J10 | ARM Cortex 2×5 (1.27mm) | 10 | JTAG Debug Interface |
 | J11 | Pin Header 1×6 (2.54mm) | 6 | UART Debug + Boot Control |
+| J12 | JST-PH 2-pin | 2 | RPM Input (12V Square Wave) |
+| J13 | JST-PH 2-pin | 2 | VSS Input (700R4 VR Sensor) |
+| J14 | JST-XH 5-pin | 5 | Encoder 1 - Power Steering Speed (via MCP23017) |
+| J15 | JST-XH 5-pin | 5 | Encoder 2 - Future Use (via MCP23017) |
+| J16 | JST-XH 5-pin | 5 | Encoder 3 - Future Use (via MCP23017) |
+| J17 | JST-XH 5-pin | 5 | Encoder 4 - Future Use (via MCP23017) |
+| J18 | JST-XH 5-pin | 5 | Encoder 5 - Future Use (via MCP23017) |
 
 ## System Block Diagram
 
 ```
-                    ┌──────────────────────────────────────────────────────────────────┐
-     12V IN         │                    MASTER CUSTOM PCB                             │
-        │           │                                                                  │
-        ▼           │   ┌─────────┐    ┌─────────────────────────────────────┐        │
-   ┌─────────┐      │   │  USB-C  │    │     ESP32-S3-WROOM-1-N16R8         │        │
-   │ MP2359  │──3.3V──►│  (J2)   │◄──►│                                     │        │
-   │  Buck   │      │   │         │    │  GPIO 19/20: USB D+/D-             │        │
-   └────┬────┘      │   └─────────┘    │  SPI1: MCP2515 (CAN)               │        │
-        │           │                   │  SPI2: Slave Communication          │        │
-       12V──────────│───────────────────│  SPI3: SD Card                      │        │
-        │           │   ┌─────────┐    │  GPIO 4-6: Rotary Encoder           │        │
-        ▼           │   │ MCP2515 │◄──►│  GPIO 7: PWM Output                 │        │
-   ┌─────────┐      │   │   CAN   │    └─────────────────────────────────────┘        │
-   │  LM358  │◄─────│───│ + TJA   │                    │                              │
-   │ Op-Amp  │      │   │  (J3)   │            ┌───────┴───────┐                      │
-   └────┬────┘      │   └────┬────┘            │   Micro SD    │                      │
-        │           │        │                 │     (J8)      │                      │
-        ▼           │        ▼                 └───────────────┘                      │
-   ┌─────────┐      │   ┌─────────┐                                                   │
-   │ JST-PH  │      │   │ JST-GH  │     ┌─────────┐        ┌─────────┐               │
-   │PWM (J6) │      │   │CAN (J4) │     │ JST-XH  │        │ JST-GH  │               │
-   └────┬────┘      │   └────┬────┘     │ENC (J5) │        │SPI (J7) │               │
-        │           │        │          └────┬────┘        └────┬────┘               │
-        ▼           │        ▼               │                  │                    │
-   Motor Ctrl       │    CAN Bus         Rotary              Slave                   │
-   (0-5V)           │  (CANH/CANL)       Encoder             Board                   │
-                    └──────────────────────────────────────────────────────────────────┘
+                    ┌────────────────────────────────────────────────────────────────────────────────┐
+     12V IN         │                           MASTER CUSTOM PCB                                    │
+        │           │                                                                                │
+        ▼           │   ┌─────────┐    ┌─────────────────────────────────────┐                      │
+   ┌─────────┐      │   │  USB-C  │    │     ESP32-S3-WROOM-1-N16R8         │                      │
+   │ MP2359  │──3.3V──►│  (J2)   │◄──►│                                     │                      │
+   │  Buck   │      │   │         │    │  GPIO 19/20: USB D+/D-             │                      │
+   └────┬────┘      │   └─────────┘    │  GPIO 1: RPM Input (PCNT)          │                      │
+        │           │                   │  GPIO 38: VSS Input (PCNT)         │                      │
+        │           │                   │  GPIO 47/48: I2C (MCP23017)        │                      │
+       12V──────────│───────────────────│  SPI1: MCP2515 (CAN)               │                      │
+        │           │   ┌─────────┐    │  SPI2: Slave Communication          │                      │
+        │           │   │ MCP2515 │◄──►│  SPI3: SD Card                      │                      │
+        │           │   │   CAN   │    │  GPIO 7: PWM Output                 │                      │
+        │           │   │ + TJA   │    └──────────────┬──────────────────────┘                      │
+        │           │   │  (J3)   │                   │                                             │
+        │           │   └────┬────┘     ┌─────────────┼─────────────┐                               │
+        │           │        │          │             │             │                               │
+        ▼           │        ▼          ▼             ▼             ▼                               │
+   ┌─────────┐      │   ┌─────────┐  ┌───────┐  ┌─────────┐  ┌────────────────────┐               │
+   │  LM358  │      │   │ JST-GH  │  │ PC817 │  │ Micro SD│  │     MCP23017       │               │
+   │ Op-Amp  │      │   │CAN (J4) │  │ Opto  │  │  (J8)   │  │  I2C GPIO Expander │               │
+   └────┬────┘      │   └────┬────┘  │ (U5)  │  └─────────┘  │       (U7)         │               │
+        │           │        │       └───┬───┘               │                    │               │
+        ▼           │        │           │       ┌───────┐   │ GPA0-2: ENC1 (J14) │               │
+   ┌─────────┐      │        │       ┌───┴───┐   │LM1815 │   │ GPA3-5: ENC2 (J15) │  ┌─────────┐  │
+   │ JST-PH  │      │        │       │JST-PH │   │ VR IF │   │ GPA6-7,│           │  │  Debug  │  │
+   │PWM (J6) │      │        │       │RPM J12│   │ (U6)  │   │ GPB0:   ENC3 (J16) │  │J10/J11  │  │
+   └────┬────┘      │        │       └───┬───┘   └───┬───┘   │ GPB1-3: ENC4 (J17) │  └────┬────┘  │
+        │           │        │           │       ┌───┴───┐   │ GPB4-6: ENC5 (J18) │       │       │
+        ▼           │        ▼           ▼       │JST-PH │   └─────────┬──────────┘       ▼       │
+   Motor Ctrl       │    CAN Bus     Engine RPM  │VSS J13│             │              JTAG/UART   │
+   (0-5V PWM)       │  (CANH/CANL)   (12V Tach)  └───┬───┘    ┌────────┴────────┐      Debug     │
+                    │                                │        │                 │                 │
+                    │                                ▼        ▼                 ▼                 │
+                    │                          Vehicle    ┌───────┐  ┌───────┐  ┌───────┐        │
+                    │                           Speed     │ENC 1-5│  │ J14-  │  │Rotary │        │
+                    │                       (700R4 VR)    │via I2C│  │  J18  │  │Encoders        │
+                    │                                     └───────┘  └───────┘  └───────┘        │
+                    │                                                                             │
+                    │   Encoder Functions: J14=Power Steering, J15-J18=Future Expansion          │
+                    └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Complete Schematic
@@ -996,6 +1020,561 @@ All external peripheral connections use locking cable connectors for reliable au
 
     Note: This circuit is OPTIONAL if using native USB for programming.
           Only needed for UART-based programming/bootloader entry.
+```
+
+### Sheet 11: RPM Input (12V Square Wave Interface)
+
+```
+                              RPM INPUT INTERFACE
+════════════════════════════════════════════════════════════════════════════════
+
+    This circuit converts a 12V square wave signal (typically from an engine
+    tachometer or ignition coil) to a 3.3V signal for the ESP32-S3 PCNT input.
+
+    Features:
+    - Galvanic isolation via optocoupler (protects ESP32 from automotive noise)
+    - Reverse polarity protection
+    - Input filtering via LED forward voltage drop
+    - Clean digital output for hardware pulse counting
+
+
+    RPM INPUT CONNECTOR (J12) - 2-Pin JST-PH
+    ════════════════════════════════════════
+
+                    ┌───────────┐
+                    │  1     2  │
+                    │  ○     ○  │
+                    └──┬─────┬──┘
+                       │     │
+                      SIG   GND
+                    (12V)  (0V)
+
+    Pin Assignment:
+    ┌─────┬────────┬─────────────────────────────────────────┐
+    │ Pin │ Signal │ Description                             │
+    ├─────┼────────┼─────────────────────────────────────────┤
+    │  1  │ SIG    │ 12V square wave input (1 pulse/rev)     │
+    │  2  │ GND    │ Signal ground (common with vehicle GND) │
+    └─────┴────────┴─────────────────────────────────────────┘
+
+
+    OPTOCOUPLER LEVEL SHIFTER CIRCUIT
+    ══════════════════════════════════
+
+         12V Square Wave Input (J12.1)
+                │
+                │
+               ┌┴┐
+               │ │ R20 = 2.2K (1/4W)
+               │ │ Current limit: (12V - 1.2V) / 2.2K ≈ 4.9mA
+               └┬┘
+                │
+                ├────────────┐
+                │            │
+                │           ─┴─
+                │            ▲  D3 = 1N4148 (reverse protection)
+                │           ─┬─
+                │            │
+                ▼ LED (pin 1)│
+             ┌─────────┐     │
+             │    ○────┼─────┘
+             │  PC817  │
+             │    ○────┼──────────────────────────────────────── GND (J12.2)
+             │  (U5)   │
+             │         │  Collector (pin 4)
+             │    ○────┼──────┬──────────────────────────────── GPIO 1 (U1)
+             │         │      │
+             │    ○────┼──┐   │
+             └─────────┘  │  ┌┴┐
+                          │  │ │ R21 = 10K (pull-up)
+                   Emitter│  │ │
+                    (pin 3)  └┬┘
+                          │   │
+                         GND  └──────────────────────────────── 3V3
+
+
+    PC817 OPTOCOUPLER PINOUT
+    ════════════════════════
+
+        ┌─────────────┐
+        │  ┌───┐      │
+        │  │LED│      │           Pin 1: Anode (LED +)
+    1 ──┤  └─▼─┘      ├── 4       Pin 2: Cathode (LED -)
+        │             │           Pin 3: Emitter (transistor)
+    2 ──┤      ┌──┐   ├── 3       Pin 4: Collector (transistor)
+        │      │▶ │   │
+        │      └──┘   │
+        └─────────────┘
+
+
+    SIGNAL BEHAVIOR
+    ════════════════
+
+    Input (12V):     ┌────┐    ┌────┐    ┌────┐
+                     │    │    │    │    │    │
+              ───────┘    └────┘    └────┘    └────
+
+    Output (GPIO):   ────┐    ┌────┐    ┌────┐    ┌────
+                         │    │    │    │    │    │
+                         └────┘    └────┘    └────┘
+
+    Note: Output is INVERTED due to common-emitter configuration.
+          The ESP32 PCNT is configured to count FALLING edges.
+
+
+    DESIGN CALCULATIONS
+    ═══════════════════
+
+    1. LED Current (nominal 12V input):
+       I_LED = (V_IN - V_LED) / R20
+             = (12V - 1.2V) / 2.2kΩ
+             = 4.9 mA
+       PC817 rated for 50mA max, 4.9mA provides good margin.
+
+    2. LED Current (worst case 14.4V input during charging):
+       I_LED = (14.4V - 1.2V) / 2.2kΩ
+             = 6.0 mA
+       Still well within limits.
+
+    3. LED Current (low battery 10V):
+       I_LED = (10V - 1.2V) / 2.2kΩ
+             = 4.0 mA
+       Still sufficient for reliable operation (PC817 needs ~1mA min).
+
+    4. Maximum Frequency:
+       PC817 typical rise/fall time: 4µs/3µs
+       Maximum reliable frequency: ~50 kHz
+       At 10,000 RPM with 1 pulse/rev: 167 Hz (well within limits)
+
+    5. Pull-up Resistor:
+       R21 = 10kΩ provides ~0.33mA collector current when ON.
+       PC817 CTR (Current Transfer Ratio) typically 50-300%.
+       With 4.9mA LED current, transistor can sink up to 14.7mA.
+       10kΩ pull-up requires only 0.33mA - very reliable.
+
+
+    ALTERNATIVE: TRANSISTOR LEVEL SHIFTER (No Isolation)
+    ════════════════════════════════════════════════════
+
+    If galvanic isolation is not required, a simpler circuit can be used:
+
+         12V Square Wave Input
+                │
+               ┌┴┐
+               │ │ 10K
+               └┬┘
+                │
+                ├──────┬──────────────────── GPIO 1
+                │      │
+               ┌┴┐    ┌┴┐
+          22K  │ │    │ │ 10K (pull-up to 3.3V)
+               └┬┘    └┬┘
+                │      │
+                │      └───────────────────── 3V3
+               ─┴─
+              ╱   ╲  3.3V Zener (protection)
+               ───
+                │
+               GND
+
+    This circuit is simpler but does NOT provide isolation.
+    Use optocoupler version for automotive applications.
+
+
+    WIRING NOTES
+    ════════════
+
+    1. Source Signals:
+       - Ignition coil negative terminal (inverted tach signal)
+       - ECU tachometer output (if available)
+       - Aftermarket tach adapter output
+
+    2. Wire Gauge:
+       - 22-24 AWG sufficient for signal level
+       - Keep wires twisted pair for noise rejection
+
+    3. Shielding:
+       - Use shielded cable in high-noise environments
+       - Connect shield to GND at one end only
+
+    4. Ground Connection:
+       - J12.2 must share common ground with signal source
+       - Optocoupler provides isolation between vehicle and ESP32 grounds
+```
+
+### Sheet 12: VSS Input (Vehicle Speed Sensor - GM 700R4)
+
+```
+                              VSS INPUT INTERFACE (LM1815 VR Sensor)
+════════════════════════════════════════════════════════════════════════════════
+
+    This circuit converts the AC sine wave signal from a GM 700R4 transmission
+    Variable Reluctance (VR) speed sensor to a 3.3V digital signal for the
+    ESP32-S3 PCNT input.
+
+    Features:
+    - LM1815 dedicated VR sensor interface IC
+    - Adaptive threshold automatically adjusts to signal amplitude
+    - Works reliably from parking lot speeds to highway speeds
+    - Minimal external components
+    - 8000 PPM (Pulses Per Mile) sensor compatibility
+
+
+    VSS INPUT CONNECTOR (J13) - 2-Pin JST-PH
+    ════════════════════════════════════════
+
+                    ┌───────────┐
+                    │  1     2  │
+                    │  ○     ○  │
+                    └──┬─────┬──┘
+                       │     │
+                     VR+    VR-
+                   (Signal) (GND)
+
+    Pin Assignment:
+    ┌─────┬────────┬─────────────────────────────────────────┐
+    │ Pin │ Signal │ Description                             │
+    ├─────┼────────┼─────────────────────────────────────────┤
+    │  1  │ VR+    │ VR sensor signal (AC sine wave)         │
+    │  2  │ VR-    │ Sensor ground (transmission case GND)   │
+    └─────┴────────┴─────────────────────────────────────────┘
+
+
+    LM1815 VR SENSOR INTERFACE CIRCUIT
+    ══════════════════════════════════
+
+                                    3V3
+                                     │
+                        ┌────────────┼────────────────────────────────┐
+                        │            │                                │
+                       ═══          ┌┴┐                               │
+                   C14 │            │ │ R22                           │
+                  100nF│            │ │ 10K (pullup)                  │
+                        │            └┬┘                               │
+                       ─┴─            │                                │
+                       ///            │                                │
+                                      │                                │
+                                      │    ┌────────────────────────┐  │
+                                      │    │                        │  │
+                                      └────┤ 8 VCC      LM1815     │  │
+                                           │          (U6)         │  │
+                                           │ 7 OUTPUT ─────────────┼──┼── GPIO 38 (U1)
+                                           │                        │  │
+                       ┌───────────────────┤ 6 RSET                │  │
+                       │                   │                        │  │
+                      ┌┴┐                  │ 5 CSET (NC)           │  │
+                  R23 │ │                  │                        │  │
+                 200K │ │                  │ 4 VR-  ────────────────┼──┼── GND (J13.2)
+                      └┬┘                  │                        │  │
+                       │                   │ 3 VR+  ───┬────────────┼──┼── VR Signal (J13.1)
+                      ─┴─                  │           │            │  │
+                      ///                  │ 2 NC      │            │  │
+                                           │           │            │  │
+                                           │ 1 GND ────┼────────────┼──┘
+                                           │           │            │
+                                           └───────────┼────────────┘
+                                                       │
+                                                      ═══ C15
+                                                      │   1nF (optional filter)
+                                                      │
+                                                     ─┴─
+                                                     ///
+                                                     GND
+
+
+                                    TVS Diode (Transient Protection)
+                                    ════════════════════════════════
+
+                     VR Signal (J13.1)
+                            │
+                       ┌────┴────┐
+                       │  TVS    │
+                       │P6KE33CA │
+                       │(Bi-dir) │
+                       └────┬────┘
+                            │
+                           ─┴─
+                           ///
+                           GND
+
+
+    LM1815 PINOUT REFERENCE
+    ═══════════════════════
+
+            ┌─────────────────┐
+            │  ┌───────────┐  │
+        1 ──┤  │           │  ├── 8   Pin 1: GND
+            │  │  LM1815   │  │       Pin 2: NC (No Connection)
+        2 ──┤  │           │  ├── 7   Pin 3: VR+ (Sensor Input +)
+            │  │           │  │       Pin 4: VR- (Sensor Input -)
+        3 ──┤  │           │  ├── 6   Pin 5: CSET (Internal - NC)
+            │  │           │  │       Pin 6: RSET (Threshold Timing)
+        4 ──┤  │           │  ├── 5   Pin 7: OUTPUT (Open Collector)
+            │  └───────────┘  │       Pin 8: VCC (3.3V-12V)
+            └─────────────────┘
+
+
+    DESIGN CALCULATIONS
+    ═══════════════════
+
+    1. RSET Selection (R23):
+       200kΩ provides good general-purpose adaptive threshold behavior
+       - Lower values (50k-100k): Faster adaptation, less noise immunity
+       - Higher values (200k-500k): Slower adaptation, better noise immunity
+
+    2. Output Pull-up (R22):
+       I_pullup = 3.3V / 10kΩ = 0.33 mA
+       LM1815 output can sink up to 20mA
+       0.33mA << 20mA  ✓ Reliable operation guaranteed
+
+    3. Expected Frequency Range (8000 PPM):
+       At 5 MPH:   11 Hz
+       At 60 MPH:  133 Hz
+       At 120 MPH: 267 Hz
+       LM1815 supports up to 30kHz+ - well within limits
+
+    4. Speed Calculation:
+       Speed (MPH) = (Frequency_Hz × 3600) / 8000
+                   = Frequency_Hz × 0.45
+
+
+    SIGNAL BEHAVIOR
+    ═══════════════
+
+    VR Sensor Input:     /\      /\      /\      /\
+    (AC Sine)           /  \    /  \    /  \    /  \
+                       /    \  /    \  /    \  /    \
+                  ────/      \/      \/      \/      \────
+
+    LM1815 Output:   ┌────┐  ┌────┐  ┌────┐  ┌────┐
+    (Digital)        │    │  │    │  │    │  │    │
+                  ───┘    └──┘    └──┘    └──┘    └────
+
+    ESP32 PCNT counts edges (configurable: rising or falling)
+
+
+    WIRING NOTES
+    ════════════
+
+    1. Sensor Location:
+       - GM 700R4 VSS sensor is mounted on the tail housing
+       - 2-wire connector (signal + ground)
+
+    2. Cable Requirements:
+       - 20-22 AWG twisted pair (shielded preferred)
+       - Maximum length: 5 meters
+       - Shield connects to GND at board end only
+
+    3. Ground Connection:
+       - VR- (J13.2) connects to transmission case ground
+       - Ensure good chassis ground at transmission
+
+    4. Routing:
+       - Keep away from ignition wires and spark plug cables
+       - Use grommets through firewalls
+       - Leave service loop near transmission
+```
+
+### Sheet 13: MCP23017 I2C GPIO Expander & Encoder Array
+
+```
+                              MCP23017 ENCODER MULTIPLEXER
+════════════════════════════════════════════════════════════════════════════════
+
+    The MCP23017 provides 16 GPIO pins via I2C, allowing up to 5 rotary encoders
+    (3 pins each: CLK, DT, SW) using only 2 ESP32 pins.
+
+    Features:
+    - 5 rotary encoder connectors (J14-J18)
+    - Single I2C bus (GPIO 47/48)
+    - Optional interrupt for responsive detection
+    - J14 assigned to Power Steering speed control
+
+
+    MCP23017 I2C GPIO EXPANDER CIRCUIT (U7)
+    ═══════════════════════════════════════
+
+                                      3.3V
+                                       │
+          ┌────────────────────────────┼────────────────────────────────┐
+          │                            │                                │
+         ═══ C16                      ┌┴┐                              ┌┴┐
+         │   100nF                R24 │ │ 10K                      R25 │ │ 10K
+         │                            └┬┘                              └┬┘
+        ─┴─                            │                                │
+        ///                            │                                │
+                                       │                                │
+    GPIO 47 (SDA) ─────────────────────┴────────────────────────────────┼────┐
+                                                                        │    │
+    GPIO 48 (SCL) ──────────────────────────────────────────────────────┘    │
+                                                                              │
+                                       ┌──────────────────────────────────────┘
+                                       │
+                                       │
+                         ┌─────────────┴─────────────────────────────────────┐
+                         │                  MCP23017 (U7)                    │
+                         │                                                   │
+    3.3V ────────────────┤ 9  VDD                                           │
+                         │                                                   │
+    GND ─────────────────┤ 10 VSS                                           │
+                         │                                                   │
+    GPIO 47 (SDA) ───────┤ 13 SDA                                           │
+                         │                                                   │
+    GPIO 48 (SCL) ───────┤ 12 SCL                                           │
+                         │                                                   │
+    GND ─────────────────┤ 15 A0 ─┐                                         │
+    GND ─────────────────┤ 16 A1 ─┼── Address = 0x20                        │
+    GND ─────────────────┤ 17 A2 ─┘                                         │
+                         │                                                   │
+    3.3V ────────────────┤ 18 RESET (active LOW, tie HIGH)                  │
+                         │                                                   │
+    GPIO 45 ◄────────────┤ 20 INTA (optional interrupt)                     │
+                         │                                                   │
+                         │                    DIRECTLY TO ENCODER CONNECTORS │
+                         │                                                   │
+                         │ 21 GPA0 ────────────────────────────► J14 Pin 1 (ENC1_CLK) │
+                         │ 22 GPA1 ────────────────────────────► J14 Pin 2 (ENC1_DT)  │
+                         │ 23 GPA2 ────────────────────────────► J14 Pin 3 (ENC1_SW)  │
+                         │                                                   │
+                         │ 24 GPA3 ────────────────────────────► J15 Pin 1 (ENC2_CLK) │
+                         │ 25 GPA4 ────────────────────────────► J15 Pin 2 (ENC2_DT)  │
+                         │ 26 GPA5 ────────────────────────────► J15 Pin 3 (ENC2_SW)  │
+                         │                                                   │
+                         │ 27 GPA6 ────────────────────────────► J16 Pin 1 (ENC3_CLK) │
+                         │ 28 GPA7 ────────────────────────────► J16 Pin 2 (ENC3_DT)  │
+                         │ 1  GPB0 ────────────────────────────► J16 Pin 3 (ENC3_SW)  │
+                         │                                                   │
+                         │ 2  GPB1 ────────────────────────────► J17 Pin 1 (ENC4_CLK) │
+                         │ 3  GPB2 ────────────────────────────► J17 Pin 2 (ENC4_DT)  │
+                         │ 4  GPB3 ────────────────────────────► J17 Pin 3 (ENC4_SW)  │
+                         │                                                   │
+                         │ 5  GPB4 ────────────────────────────► J18 Pin 1 (ENC5_CLK) │
+                         │ 6  GPB5 ────────────────────────────► J18 Pin 2 (ENC5_DT)  │
+                         │ 7  GPB6 ────────────────────────────► J18 Pin 3 (ENC5_SW)  │
+                         │                                                   │
+                         │ 8  GPB7 ──── NC (available for future use)       │
+                         │                                                   │
+                         └───────────────────────────────────────────────────┘
+
+
+    ENCODER CONNECTORS (J14-J18) - JST-XH 5-Pin
+    ═══════════════════════════════════════════
+
+    All encoder connectors share the same pinout:
+
+                    ┌───────────────────────────┐
+                    │ ┌───┬───┬───┬───┬───┐     │
+                    │ │ 1 │ 2 │ 3 │ 4 │ 5 │     │  ← Polarization key
+                    │ └─┬─┴─┬─┴─┬─┴─┬─┴─┬─┘     │
+                    └───┼───┼───┼───┼───┼───────┘
+                        │   │   │   │   │
+                       CLK  DT  SW  3V3 GND
+                       (A)  (B)
+
+    Pin Assignment (same for J14, J15, J16, J17, J18):
+    ┌─────┬────────┬─────────────────────────────────────┐
+    │ Pin │ Signal │ Description                         │
+    ├─────┼────────┼─────────────────────────────────────┤
+    │  1  │ CLK    │ Encoder Channel A (via MCP23017)    │
+    │  2  │ DT     │ Encoder Channel B (via MCP23017)    │
+    │  3  │ SW     │ Push button (via MCP23017)          │
+    │  4  │ 3V3    │ 3.3V power for encoder              │
+    │  5  │ GND    │ Ground                              │
+    └─────┴────────┴─────────────────────────────────────┘
+
+    Mating Connector: JST XHP-5 (housing) + SXH-001T-P0.6 (crimp terminals)
+
+
+    ENCODER CONNECTOR ASSIGNMENTS
+    ═════════════════════════════
+
+    ┌──────┬────────────────────────────┬───────────────────────────────┐
+    │ Conn │ Function                   │ MCP23017 Pins                 │
+    ├──────┼────────────────────────────┼───────────────────────────────┤
+    │ J14  │ Power Steering Speed       │ GPA0 (CLK), GPA1 (DT), GPA2 (SW) │
+    │ J15  │ Future Use                 │ GPA3 (CLK), GPA4 (DT), GPA5 (SW) │
+    │ J16  │ Future Use                 │ GPA6 (CLK), GPA7 (DT), GPB0 (SW) │
+    │ J17  │ Future Use                 │ GPB1 (CLK), GPB2 (DT), GPB3 (SW) │
+    │ J18  │ Future Use                 │ GPB4 (CLK), GPB5 (DT), GPB6 (SW) │
+    └──────┴────────────────────────────┴───────────────────────────────┘
+
+
+    MCP23017 PINOUT REFERENCE (DIP-28 / SOIC-28)
+    ════════════════════════════════════════════
+
+              ┌─────────────────────────────┐
+              │  ┌───────────────────────┐  │
+      GPB0 ───┤1                       28├─── GPA7
+      GPB1 ───┤2                       27├─── GPA6
+      GPB2 ───┤3                       26├─── GPA5
+      GPB3 ───┤4                       25├─── GPA4
+      GPB4 ───┤5       MCP23017        24├─── GPA3
+      GPB5 ───┤6                       23├─── GPA2
+      GPB6 ───┤7                       22├─── GPA1
+      GPB7 ───┤8                       21├─── GPA0
+       VDD ───┤9                       20├─── INTA
+       VSS ───┤10                      19├─── INTB
+        NC ───┤11                      18├─── RESET
+       SCL ───┤12                      17├─── A2
+       SDA ───┤13                      16├─── A1
+        NC ───┤14                      15├─── A0
+              │  └───────────────────────┘  │
+              └─────────────────────────────┘
+
+
+    INTERNAL PULL-UPS
+    ═════════════════
+
+    The MCP23017 has configurable internal pull-ups (100kΩ typ).
+    Enable them in firmware for encoder inputs:
+
+        mcp.pinMode(pin, INPUT_PULLUP);
+
+    This eliminates the need for external pull-up resistors on encoder lines.
+
+
+    POWER STEERING SPEED CONTROL (J14 / ENC1)
+    ═════════════════════════════════════════
+
+    The first encoder (J14) is dedicated to controlling the power steering
+    assist motor speed via the PWM output (J6).
+
+    Control Flow:
+    ┌─────────────┐      ┌───────────┐      ┌──────────┐      ┌────────────┐
+    │   Rotary    │      │ MCP23017  │      │  ESP32   │      │  PWM Out   │
+    │  Encoder    │─────►│   I2C     │─────►│ Process  │─────►│   (J6)     │
+    │   (J14)     │      │   (U7)    │      │  Speed   │      │  0-5V      │
+    └─────────────┘      └───────────┘      └──────────┘      └────────────┘
+                                                                    │
+                                                                    ▼
+                                                          ┌─────────────────┐
+                                                          │  Power Steering │
+                                                          │   Motor Driver  │
+                                                          └─────────────────┘
+
+    Settings (defined in config.h):
+    - Range: 0-100%
+    - Step: 5% per detent
+    - Default: 50%
+
+
+    WIRING NOTES
+    ════════════
+
+    1. I2C Bus:
+       - Keep I2C traces short (<10cm on PCB)
+       - 10K pull-ups on SDA/SCL (R24, R25)
+       - Decoupling cap (C16) close to MCP23017
+
+    2. Encoder Cables:
+       - 24-28 AWG stranded wire
+       - Keep cables under 50cm
+       - Shielded cable recommended for panel-mount encoders
+
+    3. Power:
+       - 3.3V provided on each connector
+       - Total encoder current: ~5mA each = 25mA max for all 5
+```
 
 
     DEBUG USE CASES
@@ -1028,12 +1607,12 @@ All external peripheral connections use locking cable connectors for reliable au
 | GPIO | Function | Direction | Connected To | Notes |
 |------|----------|-----------|--------------|-------|
 | 0 | BOOT | I | Boot button / J11 Pin 6 | Strapping pin (LOW=bootloader) |
-| 1 | - | - | Expansion | Available |
+| 1 | RPM_IN | I | Optocoupler output (U5) | 12V square wave via PC817 |
 | 2 | COMM_SPI_MOSI | O | Slave MOSI (J7) | SPI to slave |
 | 3 | COMM_SPI_MISO | I | Slave MISO (J7) | SPI from slave |
-| 4 | ENC_CLK | I | Encoder CLK (J5) | Rotary encoder A |
-| 5 | ENC_DT | I | Encoder DT (J5) | Rotary encoder B |
-| 6 | ENC_SW | I | Encoder SW (J5) | Encoder button |
+| 4 | - | - | Expansion | Available (was encoder) |
+| 5 | - | - | Expansion | Available (was encoder) |
+| 6 | - | - | Expansion | Available (was encoder) |
 | 7 | PWM_OUT | O | RC Filter (R1) | PWM motor control |
 | 8 | SD_CD | I | SD Card Detect (J8) | Optional card detect |
 | 9 | MCP_INT | I | MCP2515 INT (J3) | CAN interrupt |
@@ -1052,14 +1631,17 @@ All external peripheral connections use locking cable connectors for reliable au
 | 22-25 | - | - | Expansion | Available |
 | 26-32 | FLASH | - | Internal | Reserved - DO NOT USE |
 | 33-37 | PSRAM | - | Internal | Reserved - DO NOT USE |
-| 38 | - | - | Expansion | Available |
+| 38 | VSS_IN | I | LM1815 output (U6) | VR speed sensor via J13 |
 | 39 | JTAG_TCK | I/O | J10 Pin 4 | JTAG Test Clock |
 | 40 | JTAG_TDO | O | J10 Pin 6 | JTAG Test Data Out |
 | 41 | JTAG_TDI | I | J10 Pin 8 | JTAG Test Data In |
 | 42 | JTAG_TMS | I/O | J10 Pin 2 | JTAG Test Mode Select |
 | 43 | UART_TX | O | J11 Pin 3 | Debug UART transmit |
 | 44 | UART_RX | I | J11 Pin 4 | Debug UART receive |
-| 45-48 | - | - | Expansion | Available |
+| 45 | MCP23017_INT | I | MCP23017 INTA (U7) | Encoder interrupt (optional) |
+| 46 | - | - | Expansion | Available |
+| 47 | I2C_SDA | I/O | MCP23017 SDA (U7) | I2C data for encoders |
+| 48 | I2C_SCL | O | MCP23017 SCL (U7) | I2C clock for encoders |
 | EN | Reset | I | Reset btn / J10 Pin 10 / J11 Pin 5 | Active low reset |
 
 ## Bill of Materials (BOM)
@@ -1072,6 +1654,9 @@ All external peripheral connections use locking cable connectors for reliable au
 | U2 | MP2359DJ-LF-Z | SOT23-6 | 1 | Buck regulator (or MP1584 module) |
 | U3 | LM358P | DIP-8/SOIC-8 | 1 | Dual op-amp |
 | U4 | USBLC6-2SC6 | SOT23-6 | 1 | USB ESD protection |
+| U5 | PC817C | DIP-4/SOP-4 | 1 | Optocoupler (RPM input isolation) |
+| U6 | LM1815M | SOIC-8 | 1 | VR sensor interface (VSS input) |
+| U7 | MCP23017 | DIP-28/SOIC-28 | 1 | I2C GPIO expander (5 encoders) |
 
 ### Passive Components
 
@@ -1088,8 +1673,17 @@ All external peripheral connections use locking cable connectors for reliable au
 | R2 | 10K | 0402/0603 | 6 | FB divider, gain, SD pull-ups |
 | R3 | 10K | 0402/0603 | 1 | RC filter |
 | R4 | 5.1K | 0402/0603 | 3 | Feedback, USB CC |
-| R5-R7 | 10K | 0402/0603 | 3 | Pull-ups (EN, IO0, encoder) |
+| R5-R6 | 10K | 0402/0603 | 2 | Pull-ups (EN, IO0) |
 | R8-R9 | 47K | 0402/0603 | 2 | SD MISO, Card detect pull-up |
+| R20 | 2.2K | 0402/0603 | 1 | RPM optocoupler LED current limit |
+| R21 | 10K | 0402/0603 | 1 | RPM optocoupler collector pull-up |
+| R22 | 10K | 0402/0603 | 1 | VSS LM1815 output pull-up |
+| R23 | 200K | 0402/0603 | 1 | VSS LM1815 RSET (threshold timing) |
+| C14 | 100nF | 0402 | 1 | VSS LM1815 VCC bypass |
+| C15 | 1nF | 0402 | 1 | VSS input filter (optional) |
+| R24 | 10K | 0402/0603 | 1 | I2C SDA pull-up (MCP23017) |
+| R25 | 10K | 0402/0603 | 1 | I2C SCL pull-up (MCP23017) |
+| C16 | 100nF | 0402 | 1 | MCP23017 VCC bypass |
 
 ### Connectors (Locking Cable Connectors)
 
@@ -1099,13 +1693,19 @@ All external peripheral connections use locking cable connectors for reliable au
 | J2 | USB-C Receptacle | GCT USB4110 | 16 | USB programming/debug |
 | J3 | JST-XH Vertical | B7B-XH-A | 7 | MCP2515 CAN module |
 | J4 | JST-GH Vertical | SM04B-GHS-TB | 4 | CAN bus cable (CANH/CANL/12V/GND) |
-| J5 | JST-XH Vertical | B5B-XH-A | 5 | Rotary encoder cable |
 | J6 | JST-PH Vertical | B3B-PH-K-S | 3 | PWM output (SIG/5V/GND) |
 | J7 | JST-GH Vertical | SM06B-GHS-TB | 6 | SPI slave cable |
 | J8 | Micro SD Slot | Molex 504077 | 8+1 | Push-push micro SD |
 | J9 | Pin Header 2.54mm | - | 2×7 | Expansion GPIOs |
 | J10 | ARM Cortex Debug 1.27mm | Samtec FTSH-105-01 | 2×5 | JTAG/SWD debug (shrouded) |
 | J11 | Pin Header 2.54mm RA | - | 1×6 | UART debug (right-angle) |
+| J12 | JST-PH Vertical | B2B-PH-K-S | 2 | RPM input (12V square wave) |
+| J13 | JST-PH Vertical | B2B-PH-K-S | 2 | VSS input (700R4 VR sensor) |
+| J14 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 1 - Power Steering (via MCP23017) |
+| J15 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 2 - Future Use (via MCP23017) |
+| J16 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 3 - Future Use (via MCP23017) |
+| J17 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 4 - Future Use (via MCP23017) |
+| J18 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 5 - Future Use (via MCP23017) |
 
 ### Mating Cable Connectors (for harness assembly)
 
@@ -1113,9 +1713,11 @@ All external peripheral connections use locking cable connectors for reliable au
 |-----|---------|----------------|-------|
 | J3 (MCP2515) | XHP-7 | SXH-001T-P0.6 | JST-XH 7-pos |
 | J4 (CAN bus) | GHR-04V-S | SSH-003T-P0.2 | JST-GH 4-pos |
-| J5 (Encoder) | XHP-5 | SXH-001T-P0.6 | JST-XH 5-pos |
 | J6 (PWM out) | PHR-3 | SPH-002T-P0.5S | JST-PH 3-pos |
 | J7 (SPI slave) | GHR-06V-S | SSH-003T-P0.2 | JST-GH 6-pos |
+| J12 (RPM in) | PHR-2 | SPH-002T-P0.5S | JST-PH 2-pos |
+| J13 (VSS in) | PHR-2 | SPH-002T-P0.5S | JST-PH 2-pos |
+| J14-J18 (Encoders) | XHP-5 | SXH-001T-P0.6 | JST-XH 5-pos (×5) |
 
 ### Miscellaneous
 
@@ -1125,6 +1727,8 @@ All external peripheral connections use locking cable connectors for reliable au
 | SW2 | Tactile Switch 6mm | 1 | Boot button (optional) |
 | D1 | SS34 | 1 | Reverse polarity protection |
 | D2 | SMBJ15A | 1 | TVS surge protection |
+| D3 | 1N4148 | 1 | RPM input reverse protection |
+| D4 | P6KE33CA | 1 | VSS transient protection (bidirectional) |
 | JP1 | 2-pin header + jumper | 1 | CAN 120Ω termination select |
 
 ## PCB Design Notes
@@ -1165,15 +1769,16 @@ All external peripheral connections use locking cable connectors for reliable au
 5. **SPI Signals**
    - Keep clock traces short
    - Ground guard traces between SPI buses if both active
+```
 
 ### Board Dimensions
 
 Suggested size: 75mm × 55mm (accommodates SD card, debug headers, and all connectors)
 
-```
+
 ┌────────────────────────────────────────────────────────────────────────────┐
 │  ○                                                                      ○  │
-│     ┌──────┐                              ┌──────────────┐                  │
+│     ┌──────┐                              ┌──────────────┐                 │
 │     │USB-C │    ESP32-S3-WROOM-1          │  MCP2515     │  ┌─────┐        │
 │     │ (J2) │    ┌──────────────┐          │  Module (J3) │  │ CAN │        │
 │     └──────┘    │              │          └──────────────┘  │(J4) │        │
@@ -1183,14 +1788,15 @@ Suggested size: 75mm × 55mm (accommodates SD card, debug headers, and all conne
 │  │  (J1)   │    │              │          │   (J8)     │    ┌─────────┐    │
 │  │ Screw   │    └──────────────┘          └────────────┘    │ JTAG    │    │
 │  └─────────┘                                                │ (J10)   │    │
-│                                                             │ 2×5     │    │
-│  ┌─────┐   ┌─────┐        [RST] [BOOT]                      └─────────┘    │
-│  │ PWM │   │ SPI │                                                         │
-│  │(J6) │   │(J7) │   ○ ○ ○ ○ ○ ○ ○        ┌─────────┐   ○ ○ ○ ○ ○ ○        │
-│  │JST  │   │JST  │   ○ ○ ○ ○ ○ ○ ○        │Encoder  │   UART (J11)         │
-│  └─────┘   └─────┘   Expansion (J9)       │  (J5)   │   1×6 horiz          │
-│                                           │ JST-XH  │                      │
-│  ○                                        └─────────┘                   ○  │
+│                 ┌───┐ [U5]                                  │ 2×5     │    │
+│  ┌─────┐   ┌────┤RPM├────┐    [RST] [BOOT]                  └─────────┘    │
+│  │ PWM │   │J12 │IN │    │                                                 │
+│  │(J6) │   └────┴───┴────┘                                                 │
+│  │JST  │   ┌─────┐   ○ ○ ○ ○ ○ ○ ○        ┌─────────┐   ○ ○ ○ ○ ○ ○        │
+│  └─────┘   │ SPI │   ○ ○ ○ ○ ○ ○ ○        │Encoder  │   UART (J11)         │
+│            │(J7) │   Expansion (J9)       │  (J5)   │   1×6 horiz          │
+│            │JST  │                        │ JST-XH  │                      │
+│  ○         └─────┘                        └─────────┘                   ○  │
 └────────────────────────────────────────────────────────────────────────────┘
 
 Mounting holes: 4× M3 at corners (3.2mm diameter)
@@ -1201,15 +1807,16 @@ Connector Placement Notes:
 - CAN Bus (J4): Right edge, near MCP2515 module
 - SD Card (J8): Right side, push-push slot, accessible from edge
 - PWM/SPI (J6, J7): Bottom left, grouped for cable management
-- Encoder (J5): Bottom right, panel-mount encoder cable
+- Encoders (J14-J18): Bottom edge, grouped for encoder cables via MCP23017
 - Expansion (J9): Bottom center, 2×7 pin header
 - JTAG (J10): Right side, accessible for debug probe connection
 - UART (J11): Bottom right, horizontal for easy cable routing
+- RPM Input (J12): Near optocoupler U5, accessible for engine tach cable
 ```
 
 ## Firmware Compatibility
 
-This custom PCB is 100% pin-compatible with the existing firmware for core functions. The SD card is a new addition requiring config.h updates.
+This custom PCB is 100% pin-compatible with the existing firmware for core functions. The SD card and RPM input are integrated features with dedicated firmware modules.
 
 ### Native USB (GPIO 19/20)
 
@@ -1256,6 +1863,51 @@ bool initSDCard() {
 }
 ```
 
+### RPM Input Pin Definition
+
+Already defined in `config.h`:
+
+```cpp
+// Master - RPM Input (12V square wave via level shifter)
+// Expects 1 pulse per revolution, level-shifted from 12V to 3.3V
+// Recommended circuit: Optocoupler (PC817) or transistor level shifter
+#define RPM_INPUT_PIN      1    // GPIO 1 - available input pin
+```
+
+### RPM Counter Usage Example
+
+```cpp
+#include "rpm_counter.h"
+
+void setup() {
+    Serial.begin(115200);
+
+    // Initialize RPM counter (starts disabled)
+    rpmCounterInit();
+
+    // Enable when ready to read RPM
+    rpmCounterEnable();
+}
+
+void loop() {
+    // Get current RPM reading
+    float rpm = rpmCounterGetRPM();
+
+    if (rpm > 0) {
+        Serial.printf("Engine RPM: %.0f\n", rpm);
+    }
+
+    delay(100);  // 10Hz update rate
+}
+```
+
+### RPM Counter Serial Commands
+
+| Command | Action |
+|---------|--------|
+| `p` | Enable counter / Show current RPM reading |
+| `P` | Disable counter (releases PCNT resources) |
+
 ## Cable Wiring Reference
 
 ### J4 - CAN Bus Cable (JST-GH 4-pin)
@@ -1267,18 +1919,6 @@ Pin 1 (CANH) ────── Orange ──────── CAN High
 Pin 2 (CANL) ────── Yellow ──────── CAN Low
 Pin 3 (12V)  ────── Red ─────────── +12V (OBD pin 16)
 Pin 4 (GND)  ────── Black ────────── Ground (OBD pin 4/5)
-```
-
-### J5 - Encoder Cable (JST-XH 5-pin)
-
-```
-Board Side          Cable          Encoder Side
-─────────────────────────────────────────────────
-Pin 1 (CLK)  ────── White ────────── A / CLK
-Pin 2 (DT)   ────── Green ────────── B / DT
-Pin 3 (SW)   ────── Blue ─────────── Switch
-Pin 4 (3V3)  ────── Red ──────────── VCC / +
-Pin 5 (GND)  ────── Black ────────── GND / -
 ```
 
 ### J6 - PWM Output Cable (JST-PH 3-pin)
@@ -1302,4 +1942,82 @@ Pin 3 (SCK)  ────── Green ────────── SCK (GPIO 1
 Pin 4 (CS)   ────── Blue ─────────── CS (GPIO 21)
 Pin 5 (3V3)  ────── Red ──────────── 3V3
 Pin 6 (GND)  ────── Black ────────── GND
+```
+
+### J12 - RPM Input Cable (JST-PH 2-pin)
+
+```
+Board Side          Cable          Signal Source
+─────────────────────────────────────────────────
+Pin 1 (SIG)  ────── White ────────── Tach signal (12V square wave)
+Pin 2 (GND)  ────── Black ────────── Signal ground
+
+Signal Sources:
+- ECU tachometer output (cleanest signal)
+- Ignition coil negative terminal
+- Aftermarket tachometer adapter
+- Crank position sensor output
+
+Wire Recommendations:
+- Use twisted pair cable for noise rejection
+- Keep cable under 2 meters if possible
+- Use shielded cable near ignition components
+- Connect shield to GND at board end only
+```
+
+### J13 - VSS Input Cable (JST-PH 2-pin)
+
+```
+Board Side          Cable          Sensor Side
+─────────────────────────────────────────────────
+Pin 1 (VR+)  ────── White ────────── VSS Signal (AC)
+Pin 2 (VR-)  ────── Black ────────── VSS Ground (transmission case)
+
+Sensor Location:
+- GM 700R4 transmission tail housing
+- 2-wire Variable Reluctance (VR) sensor
+- 8000 pulses per mile
+
+Wire Recommendations:
+- 20-22 AWG twisted pair (shielded preferred)
+- Maximum length: 5 meters
+- Shield connects to GND at board end only
+- Keep away from ignition wires
+- Leave service loop near transmission
+```
+
+### J14-J18 - Encoder Cables (JST-XH 5-pin)
+
+All five encoder connectors (J14-J18) share the same pinout.
+Encoders connect via MCP23017 I2C GPIO expander.
+
+```
+Board Side          Cable          Encoder Side
+─────────────────────────────────────────────────
+Pin 1 (CLK)  ────── White ────────── A / CLK
+Pin 2 (DT)   ────── Green ────────── B / DT
+Pin 3 (SW)   ────── Blue ─────────── Switch (active LOW)
+Pin 4 (3V3)  ────── Red ──────────── VCC / +
+Pin 5 (GND)  ────── Black ────────── GND / -
+
+Connector Assignments:
+┌──────┬────────────────────────────────────────────────┐
+│ J14  │ Power Steering Speed - Main control encoder    │
+│ J15  │ Future Use - Available for expansion           │
+│ J16  │ Future Use - Available for expansion           │
+│ J17  │ Future Use - Available for expansion           │
+│ J18  │ Future Use - Available for expansion           │
+└──────┴────────────────────────────────────────────────┘
+
+Compatible Encoders:
+- KY-040 rotary encoder module
+- EC11 panel-mount encoders
+- Alps EC11 series
+- Bourns PEC11 series
+
+Wire Recommendations:
+- 24-28 AWG stranded wire
+- Keep cables under 50cm for reliable operation
+- Shielded cable recommended for panel-mount encoders
+- Use connector on both ends for easy replacement
 ```
