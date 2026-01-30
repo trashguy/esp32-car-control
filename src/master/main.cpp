@@ -4,6 +4,7 @@
 #include "master/spi_master.h"
 #include "master/sd_handler.h"
 #include "can_handler.h"
+#include "rpm_counter.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 
@@ -108,6 +109,14 @@ void setup() {
     // CAN disabled for now
     // canInit();
 
+    // Initialize RPM counter (starts disabled)
+    // Enable with 'r' command, disable with 'R' command
+    if (rpmCounterInit()) {
+        Serial.printf("RPM counter: GPIO %d (disabled, use 'r' to enable)\n", RPM_INPUT_PIN);
+    } else {
+        Serial.println("WARNING: RPM counter init failed");
+    }
+
     Serial.println("\nStarting tasks...\n");
 
     // Start all FreeRTOS tasks
@@ -126,7 +135,7 @@ void setup() {
                   FAILSAFE_PWM_DUTY, FAILSAFE_PWM_DUTY * 100.0 / 255.0);
     Serial.println("=======================\n");
 
-    Serial.println("Commands: c=stats, h=health, T=tasks, ?=help\n");
+    Serial.println("Commands: c=stats, h=health, T=tasks, p/P=pulse rpm on/off, ?=help\n");
 }
 
 void loop() {

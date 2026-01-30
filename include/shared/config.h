@@ -26,12 +26,72 @@
 #define MCP2515_CS_PIN   10
 #define MCP2515_INT_PIN  9
 
-// Master - KY-040 Rotary Encoder
-// Button press toggles AUTO/MANUAL mode
-// Rotation adjusts manual RPM (0-4000 in 100 increments)
-#define ENCODER_CLK_PIN  4   // Clock (A) pin
-#define ENCODER_DT_PIN   5   // Data (B) pin
-#define ENCODER_SW_PIN   6   // Switch (button) pin
+// Master - Available GPIOs (formerly direct encoder, now freed up)
+// GPIO 4, 5, 6 are available for other uses
+// All rotary encoders now go through MCP23017 I2C expander
+
+// =============================================================================
+// Master - I2C Bus for MCP23017 GPIO Expander
+// =============================================================================
+// Provides 16 additional GPIOs for multiple rotary encoders
+// See docs/schematics/master-custom-pcb.md Sheet 13 for circuit details
+#define I2C_MASTER_SDA_PIN    47    // I2C Data
+#define I2C_MASTER_SCL_PIN    48    // I2C Clock
+#define I2C_MASTER_FREQ       400000 // 400kHz Fast mode
+
+// MCP23017 Configuration
+#define MCP23017_ADDR         0x20  // I2C address (A0=A1=A2=GND)
+#define MCP23017_INT_PIN      45    // Interrupt pin (optional, directly connected to INTA)
+
+// =============================================================================
+// Master - Multiplexed Rotary Encoders (via MCP23017)
+// =============================================================================
+// Up to 5 encoders supported on single MCP23017 (16 pins / 3 pins per encoder)
+// Encoder pins are on MCP23017 GPIO expander, not ESP32 directly
+//
+// Connector assignments:
+//   J14 (ENC1): Power Steering Speed Control
+//   J15 (ENC2): Available for future use
+//   J16 (ENC3): Available for future use
+//   J17 (ENC4): Available for future use
+//   J18 (ENC5): Available for future use
+
+// MCP23017 pin assignments for each encoder
+// ENC1 (J14) - Power Steering Speed
+#define ENC1_MCP_CLK    0     // GPA0
+#define ENC1_MCP_DT     1     // GPA1
+#define ENC1_MCP_SW     2     // GPA2
+
+// ENC2 (J15) - Future use
+#define ENC2_MCP_CLK    3     // GPA3
+#define ENC2_MCP_DT     4     // GPA4
+#define ENC2_MCP_SW     5     // GPA5
+
+// ENC3 (J16) - Future use
+#define ENC3_MCP_CLK    6     // GPA6
+#define ENC3_MCP_DT     7     // GPA7
+#define ENC3_MCP_SW     8     // GPB0
+
+// ENC4 (J17) - Future use
+#define ENC4_MCP_CLK    9     // GPB1
+#define ENC4_MCP_DT     10    // GPB2
+#define ENC4_MCP_SW     11    // GPB3
+
+// ENC5 (J18) - Future use
+#define ENC5_MCP_CLK    12    // GPB4
+#define ENC5_MCP_DT     13    // GPB5
+#define ENC5_MCP_SW     14    // GPB6
+// Note: GPB7 (pin 15) is unused/available
+
+// Number of encoders enabled (set to number actually connected)
+#define MCP_ENCODER_COUNT     5
+
+// Encoder function assignments
+#define ENC_POWER_STEERING    0     // ENC1 - Power steering assist speed
+#define ENC_UNUSED_1          1     // ENC2 - Available
+#define ENC_UNUSED_2          2     // ENC3 - Available
+#define ENC_UNUSED_3          3     // ENC4 - Available
+#define ENC_UNUSED_4          4     // ENC5 - Available
 
 // Master - PWM Controller Interface (Analog Output)
 // ESP32-S3 has no DAC, so PWM + RC filter is used to generate 0-3.3V
@@ -42,10 +102,12 @@
 #define PWM_OUTPUT_CHANNEL  0     // LEDC channel
 #define PWM_OUTPUT_RESOLUTION 8   // 8-bit resolution (0-255)
 
-// Encoder RPM adjustment settings
-#define ENCODER_RPM_MIN  0
-#define ENCODER_RPM_MAX  4000
-#define ENCODER_RPM_STEP 100
+// Power Steering Speed Settings (ENC1 on J14)
+// Controls assist motor speed via PWM output
+#define POWER_STEERING_MIN      0       // Minimum assist (0%)
+#define POWER_STEERING_MAX      100     // Maximum assist (100%)
+#define POWER_STEERING_STEP     5       // Step size per encoder detent
+#define POWER_STEERING_DEFAULT  50      // Default assist level (50%)
 
 // Master - SD Card (SPI Mode)
 // Uses dedicated SPI bus for data logging and configuration storage
@@ -70,6 +132,19 @@
 #define DEBUG_UART_TX_PIN  43   // UART TX (GPIO 43 = U0TXD default)
 #define DEBUG_UART_RX_PIN  44   // UART RX (GPIO 44 = U0RXD default)
 #define DEBUG_UART_BAUD    115200
+
+// Master - RPM Input (12V square wave via level shifter)
+// Expects 1 pulse per revolution, level-shifted from 12V to 3.3V
+// Recommended circuit: Optocoupler (PC817) or transistor level shifter
+// See docs/schematics/rpm-input-circuit.md for circuit details
+#define RPM_INPUT_PIN      1    // GPIO 1 - available input pin
+
+// Master - VSS Input (Vehicle Speed Sensor - GM 700R4 VR Sensor)
+// 2-wire Variable Reluctance sensor, 8000 pulses per mile
+// Uses LM1815 VR sensor interface IC for adaptive threshold detection
+// See docs/schematics/vss-input-circuit.md for circuit details
+#define VSS_INPUT_PIN      38   // GPIO 38 - expansion GPIO
+#define VSS_PULSES_PER_MILE 8000  // GM 700R4 transmission
 
 // Slave - ILI9341 SPI Pins (configured via TFT_eSPI build flags in platformio.ini)
 // TFT_SCLK=12, TFT_MISO=13, TFT_MOSI=11, TFT_CS=10, TFT_DC=46, TFT_RST=-1 (shared with ESP32-S3)

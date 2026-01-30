@@ -57,9 +57,6 @@ static void drawBackground() {
     tft.setTextDatum(TC_DATUM);
     tft.setTextSize(2);
     tft.drawString("POWER STEERING", SCREEN_WIDTH / 2, 10);
-
-    tft.setTextSize(2);
-    tft.drawString("RPM", SCREEN_WIDTH / 2, LABEL_Y_POS);
 }
 
 static void drawRpmUpButton(bool pressed) {
@@ -131,28 +128,16 @@ static void drawRpmValue(uint16_t rpm, bool connected) {
 static void drawStatusIndicator(bool connected) {
     TFT_eSPI& tft = getTft();
 
-    // Clear status area
-    tft.fillRect(0, STATUS_Y_POS - 10, SCREEN_WIDTH, 20, COLOR_BACKGROUND);
-
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(1);
+    // Clear sync dot area
+    tft.fillCircle(SYNC_DOT_X, SYNC_DOT_Y, SYNC_DOT_R + 1, COLOR_BACKGROUND);
 
     if (connected) {
         bool synced = isSynced();
-        if (synced) {
-            tft.setTextColor(COLOR_CONNECTED, COLOR_BACKGROUND);
-            tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, COLOR_CONNECTED);
-            tft.drawString("SYNCED", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
-        } else {
-            tft.setTextColor(COLOR_WARNING, COLOR_BACKGROUND);
-            tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, COLOR_WARNING);
-            tft.drawString("SYNCING", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
-        }
+        uint16_t dotColor = synced ? COLOR_CONNECTED : COLOR_WARNING;
+        tft.fillCircle(SYNC_DOT_X, SYNC_DOT_Y, SYNC_DOT_R, dotColor);
     } else {
-        uint16_t indicatorColor = blinkState ? COLOR_DISCONNECTED : COLOR_BACKGROUND;
-        tft.setTextColor(COLOR_DISCONNECTED, COLOR_BACKGROUND);
-        tft.fillCircle(SCREEN_WIDTH / 2 - 50, STATUS_Y_POS, 5, indicatorColor);
-        tft.drawString("DISCONNECTED", SCREEN_WIDTH / 2 + 10, STATUS_Y_POS);
+        uint16_t dotColor = blinkState ? COLOR_DISCONNECTED : COLOR_BACKGROUND;
+        tft.fillCircle(SYNC_DOT_X, SYNC_DOT_Y, SYNC_DOT_R, dotColor);
     }
 }
 

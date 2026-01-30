@@ -9,7 +9,11 @@
 
 #define RPM_Y_POS     80
 #define LABEL_Y_POS   140
-#define STATUS_Y_POS  165
+
+// Sync status dot (top left)
+#define SYNC_DOT_X    12
+#define SYNC_DOT_Y    12
+#define SYNC_DOT_R    5
 
 // Logo layout
 #define LOGO_Y_POS    (SCREEN_HEIGHT - 30)

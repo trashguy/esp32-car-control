@@ -2,6 +2,8 @@
 #include "master/spi_master.h"
 #include "master/sd_handler.h"
 #include "can_handler.h"
+#include "rpm_counter.h"
+#include "encoder_mux.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include <Arduino.h>
@@ -483,7 +485,7 @@ static void taskSpiComm(void* param) {
 // UI Task - Encoder and Serial
 // =============================================================================
 
-static int lastEncoderClk = HIGH;
+// lastEncoderClk removed - now using MCP23017-based encoder_mux
 static uint32_t lastButtonPress = 0;
 #define BUTTON_DEBOUNCE_MS 200
 
@@ -516,6 +518,9 @@ static void printHelp() {
     Serial.println("  c - Statistics");
     Serial.println("  h - System health");
     Serial.println("  T - Task info");
+    Serial.println("RPM Pulse Counter:");
+    Serial.println("  p - Enable / show RPM reading");
+    Serial.println("  P - Disable pulse counter");
     Serial.println("SD Card:");
     Serial.println("  d - List root directory");
     Serial.println("  x - SD card info");
@@ -560,38 +565,24 @@ static void printTaskInfo() {
 }
 
 static void processEncoder() {
-    int currentClk = digitalRead(ENCODER_CLK_PIN);
-
-    if (currentClk != lastEncoderClk && currentClk == LOW) {
-        if (digitalRead(ENCODER_DT_PIN) != currentClk) {
-            // Clockwise
-            uint16_t rpm = tasksGetManualRpm();
-            if (rpm < ENCODER_RPM_MAX) {
-                tasksSetManualRpm(rpm + ENCODER_RPM_STEP);
-                Serial.printf("Encoder CW: %u\n", rpm + ENCODER_RPM_STEP);
-            }
-        } else {
-            // Counter-clockwise
-            uint16_t rpm = tasksGetManualRpm();
-            if (rpm >= ENCODER_RPM_STEP) {
-                tasksSetManualRpm(rpm - ENCODER_RPM_STEP);
-                Serial.printf("Encoder CCW: %u\n", rpm - ENCODER_RPM_STEP);
-            }
-        }
+    // Update MCP23017-based encoder state
+    if (!encoderMuxIsEnabled()) {
+        return;
     }
-    lastEncoderClk = currentClk;
 
-    // Button press
-    if (digitalRead(ENCODER_SW_PIN) == LOW) {
-        uint32_t now = millis();
-        if (now - lastButtonPress > BUTTON_DEBOUNCE_MS) {
-            lastButtonPress = now;
-            uint8_t mode = tasksGetDisplayMode();
-            uint8_t newMode = (mode == MODE_AUTO) ? MODE_MANUAL : MODE_AUTO;
-            tasksSetDisplayMode(newMode);
-            Serial.printf("Button: %s\n", newMode == MODE_AUTO ? "AUTO" : "MANUAL");
-        }
+    // Update all encoders via I2C
+    encoderMuxUpdate();
+
+    // Check power steering encoder button for mode toggle
+    if (encoderMuxButtonPressed(ENCODER_POWER_STEERING)) {
+        uint8_t mode = tasksGetDisplayMode();
+        uint8_t newMode = (mode == MODE_AUTO) ? MODE_MANUAL : MODE_AUTO;
+        tasksSetDisplayMode(newMode);
+        Serial.printf("Button: %s\n", newMode == MODE_AUTO ? "AUTO" : "MANUAL");
     }
+
+    // Power steering level is handled automatically by encoder_mux
+    // Get it when needed via encoderMuxGetPowerSteeringLevel()
 }
 
 static void processSerial() {
@@ -685,6 +676,29 @@ static void processSerial() {
             }
             break;
 
+        case 'p':
+            // Enable RPM pulse counter
+            if (!rpmCounterIsEnabled()) {
+                rpmCounterEnable();
+                Serial.println("RPM counter enabled");
+            } else {
+                // Show RPM reading
+                Serial.printf("RPM: %.0f (total pulses: %lu)\n",
+                              rpmCounterGetRPM(),
+                              rpmCounterGetTotalPulses());
+            }
+            break;
+
+        case 'P':
+            // Disable RPM pulse counter
+            if (rpmCounterIsEnabled()) {
+                rpmCounterDisable();
+                Serial.println("RPM counter disabled");
+            } else {
+                Serial.println("RPM counter already disabled");
+            }
+            break;
+
         case '?':
             printHelp();
             break;
@@ -699,11 +713,13 @@ static void taskUi(void* param) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(UI_TASK_PERIOD_MS);
 
-    // Initialize encoder pins
-    pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
-    pinMode(ENCODER_DT_PIN, INPUT_PULLUP);
-    pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
-    lastEncoderClk = digitalRead(ENCODER_CLK_PIN);
+    // Initialize MCP23017-based encoder multiplexer
+    if (encoderMuxInit()) {
+        encoderMuxEnable();
+        Serial.println("[UI Task] Encoder MUX initialized");
+    } else {
+        Serial.println("[UI Task] WARNING: Encoder MUX init failed - MCP23017 not found");
+    }
 
     Serial.println("[UI Task] Started");
 

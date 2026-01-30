@@ -12,10 +12,51 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
 
 | File | Purpose |
 |------|---------|
-| `BOM_EasyEDA.csv` | Component list with LCSC part numbers |
-| `schematic_netlist.txt` | All connections between components |
+| `BOM_EasyEDA.csv` | Complete component list (70 parts) with LCSC part numbers for JLCPCB SMT assembly |
+| `schematic_netlist.txt` | Complete netlist with all connections, GPIO assignments, and connector pinouts |
+| `project_reference_data.json` | Machine-readable BOM and netlist data (for reference/tooling, not EasyEDA import) |
 | `board_outline.json` | PCB outline coordinates |
+| `kicad/` | KiCad project files for import into EasyEDA Pro |
 | `README.md` | This guide |
+
+## Option A: Import from KiCad (Recommended)
+
+A complete KiCad project is provided in the `kicad/` directory. This is the fastest way to get started:
+
+### KiCad Files
+
+| File | Purpose |
+|------|---------|
+| `kicad/ESP32-S3-Master-PCB.kicad_pro` | KiCad project file with design rules and net classes |
+| `kicad/ESP32-S3-Master-PCB.kicad_sch` | Complete schematic with all 70 components and net labels |
+| `kicad/generate_schematic.py` | Python script used to generate the schematic (for reference) |
+
+### Import into EasyEDA Pro
+
+1. Open EasyEDA Pro: https://pro.easyeda.com
+2. Go to **File → Import → KiCad**
+3. Select the `ESP32-S3-Master-PCB.kicad_pro` file
+4. EasyEDA will import the schematic with all components
+5. Review and adjust component symbols as needed (imported symbols are simplified rectangles)
+6. Assign LCSC part numbers using the data in `BOM_EasyEDA.csv`
+7. Continue to PCB layout (Step 15)
+
+### Post-Import Tasks
+
+After importing, you'll need to:
+
+1. **Replace symbols** - The imported symbols are simplified rectangles. Use EasyEDA's library to replace with proper symbols for better visual representation.
+2. **Assign footprints** - Match footprints to LCSC parts using the BOM.
+3. **Verify connections** - Check that all nets match `schematic_netlist.txt`.
+4. **Add wires** - The import includes global labels but not physical wires. Connect components using the net labels as a guide.
+
+## Option B: Manual Creation
+
+If you prefer to create the schematic from scratch, follow the step-by-step instructions below.
+
+> **Note:** EasyEDA Pro does not support importing custom JSON project files. The schematic must be
+> created manually following the step-by-step instructions below. The BOM and netlist files provide
+> all the information needed.
 
 ## Board Specifications
 
@@ -165,22 +206,61 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
 
 ---
 
-## Step 6: Create Schematic - Rotary Encoder
+## Step 6: Create Schematic - Rotary Encoders (via MCP23017)
 
-### 6.1 Add Encoder Interface
+The PCB supports up to 5 rotary encoders through an MCP23017 I2C GPIO expander.
+Internal pull-ups (100K) in the MCP23017 are enabled in firmware, so no external
+pull-ups are needed for the encoder signals.
+
+### 6.1 Add MCP23017 I2C GPIO Expander
 
 1. **Place:**
-   - `C157991` - JST-XH 5-pin (J5)
-   - 3× `C25744` - 10K Pull-up Resistors (R17-R19)
+   - `C47023` - MCP23017-E/SO (U7)
+   - 2× `C25744` - 10K I2C Pull-up Resistors (R24, R25)
+   - `C1525` - 100nF Decoupling Cap (C16)
 
 2. **Wire:**
    ```
-   J5.1 (CLK) → R17 → +3V3, also → GPIO4
-   J5.2 (DT) → R18 → +3V3, also → GPIO5
-   J5.3 (SW) → R19 → +3V3, also → GPIO6
-   J5.4 (VCC) → +3V3
-   J5.5 (GND) → GND
+   I2C Bus:
+   U7.13 (SDA) → R24 → +3V3, also → GPIO47
+   U7.12 (SCL) → R25 → +3V3, also → GPIO48
+   
+   Interrupt:
+   U7.20 (INTB) → GPIO45
+   
+   Address (0x20):
+   U7.15 (A0) → GND
+   U7.16 (A1) → GND
+   U7.17 (A2) → GND
+   
+   Power:
+   U7.9 (VDD) → +3V3
+   U7.18 (RESET) → +3V3
+   U7.10 (VSS) → GND
+   C16 across VDD/VSS
    ```
+
+### 6.2 Add Encoder Connectors
+
+1. **Place:**
+   - 5× `C157991` - JST-XH 5-pin (J14, J15, J16, J17, J18)
+
+2. **Wire Encoder 1 (Power Steering) J14:**
+   ```
+   J14.1 (CLK) → U7.21 (GPA0)
+   J14.2 (DT)  → U7.22 (GPA1)
+   J14.3 (SW)  → U7.23 (GPA2)
+   J14.4 (VCC) → +3V3
+   J14.5 (GND) → GND
+   ```
+
+3. **Wire Encoders 2-5 (J15-J18) similarly:**
+   - J15: CLK→GPA3, DT→GPA4, SW→GPA5
+   - J16: CLK→GPA6, DT→GPA7, SW→GPB0
+   - J17: CLK→GPB1, DT→GPB2, SW→GPB3
+   - J18: CLK→GPB4, DT→GPB5, SW→GPB6
+
+   (See `schematic_netlist.txt` for complete MCP23017 pin mapping)
 
 ---
 
@@ -217,16 +297,20 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
 
 1. **Place:**
    - `C160408` - JST-GH 6-pin (J7)
+   - `C25744` - 10K Pull-up Resistor (R26) for CS
 
 2. **Wire:**
    ```
    J7.1 (MOSI) → GPIO2
    J7.2 (MISO) → GPIO3
    J7.3 (SCK) → GPIO14
-   J7.4 (CS) → GPIO21
+   J7.4 (CS) → R26 → +3V3, also → GPIO21
    J7.5 (3V3) → +3V3
    J7.6 (GND) → GND
    ```
+
+   Note: R26 keeps CS HIGH during ESP32 boot/reset, preventing the slave
+   from receiving spurious SPI data while the master GPIO is floating.
 
 ---
 
@@ -292,16 +376,77 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
 
 ---
 
-## Step 11: Create Schematic - Expansion Header
+## Step 11: Create Schematic - RPM Input (Optocoupler)
+
+Galvanic isolation for 12V square wave from engine tachometer.
+
+1. **Place:**
+   - `C66463` - PC817C Optocoupler (U5)
+   - `C25879` - 2.2K Current Limiting Resistor (R20)
+   - `C25744` - 10K Collector Pull-up (R21)
+   - `C81598` - 1N4148W Protection Diode (D3)
+   - `C131338` - JST-PH 2-pin (J12)
+
+2. **Wire:**
+   ```
+   LED Drive:
+   J12.1 (12V SIG) → R20 → U5.1 (LED Anode)
+   U5.2 (LED Cathode) → D3.K
+   D3.A → J12.2 (GND)
+   
+   Phototransistor:
+   U5.4 (Collector) → R21 → +3V3, also → GPIO1
+   U5.3 (Emitter) → GND
+   ```
+
+   Note: D3 provides reverse polarity protection. Signal is inverted.
+
+---
+
+## Step 12: Create Schematic - VSS Input (LM1815 VR Sensor Interface)
+
+Interface for GM 700R4 variable reluctance transmission speed sensor.
+
+1. **Place:**
+   - `C129587` - LM1815M/NOPB (U6)
+   - `C25744` - 10K Output Pull-up (R22)
+   - `C25811` - 200K Threshold Timing (R23)
+   - `C1525` - 100nF VCC Bypass (C14)
+   - `C1523` - 1nF Input Filter (C15, optional)
+   - `C108380` - P6KE33CA TVS Protection (D4)
+   - `C131338` - JST-PH 2-pin (J13)
+
+2. **Wire:**
+   ```
+   VR Sensor Input:
+   J13.1 (VR+) → U6.3 (IN+) → C15 → D4.1
+   J13.2 (VR-) → U6.4 (IN-) → GND
+   D4.2 → GND
+   
+   Threshold Timing:
+   U6.6 (RSET) → R23 → GND
+   
+   Output:
+   U6.7 (OUT) → R22 → +3V3, also → GPIO38
+   
+   Power:
+   U6.8 (VCC) → C14 → GND, also → +3V3
+   U6.1 (GND) → GND
+   U6.4 (GND) → GND
+   ```
+
+---
+
+## Step 13: Create Schematic - Expansion Header
 
 1. **Place:**
    - `C492405` - Header 2x7 2.54mm (J9)
 
-2. **Wire available GPIOs and power to header**
+2. **Wire available GPIOs (GPIO4, GPIO5, GPIO6, GPIO46) and power to header**
 
 ---
 
-## Step 12: Run ERC (Electrical Rules Check)
+## Step 14: Run ERC (Electrical Rules Check)
 
 1. Click **Design → Check ERC**
 2. Fix any errors (unconnected pins, etc.)
@@ -310,15 +455,15 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
 
 ---
 
-## Step 13: Create PCB
+## Step 15: Create PCB
 
-### 13.1 Convert Schematic to PCB
+### 15.1 Convert Schematic to PCB
 
 1. Click **Design → Convert to PCB**
 2. Set board size: 75mm × 55mm
 3. Set layers: 2
 
-### 13.2 Set Design Rules (JLCPCB Compatible)
+### 15.2 Set Design Rules (JLCPCB Compatible)
 
 1. **Design → Design Rules**
 2. Set:
@@ -327,29 +472,29 @@ Step-by-step guide to create the custom PCB in EasyEDA and order from JLCPCB.
    - Via: 0.6mm diameter, 0.3mm drill
    - Hole: 0.3mm min
 
-### 13.3 Draw Board Outline
+### 15.3 Draw Board Outline
 
 1. Select **Edge.Cuts** layer
 2. Draw rectangle: 75mm × 55mm
 3. Round corners: 2mm radius
 4. Or import coordinates from `board_outline.json`
 
-### 13.4 Place Components
+### 15.4 Place Components
 
 Suggested placement (see board diagram in main README):
 
 ```
 Top-left:     USB-C (J2)
 Left edge:    12V Power (J1)
-Center:       ESP32-S3 Module (U1)
+Center:       ESP32-S3 Module (U1), MCP23017 (U7)
 Top-right:    MCP2515 Header (J3), CAN connector (J4)
 Right:        SD Card (J8), JTAG (J10)
 Bottom-left:  PWM (J6), SPI Slave (J7)
-Bottom:       Expansion (J9)
-Bottom-right: Encoder (J5), UART (J11)
+Bottom:       Expansion (J9), Encoders (J14-J18)
+Bottom-right: RPM (J12), VSS (J13), UART (J11)
 ```
 
-### 13.5 Add Mounting Holes
+### 15.5 Add Mounting Holes
 
 1. Place 4× mounting holes (3.2mm) at:
    - (5, 5)
@@ -357,7 +502,7 @@ Bottom-right: Encoder (J5), UART (J11)
    - (5, 50)
    - (70, 50)
 
-### 13.6 Route Traces
+### 15.6 Route Traces
 
 1. **Auto-route** for initial routing (Tools → Auto Route)
 2. **Manual cleanup:**
@@ -365,13 +510,13 @@ Bottom-right: Encoder (J5), UART (J11)
    - Signal traces: 0.25-0.3mm
    - USB D+/D-: Match lengths
 
-### 13.7 Add Ground Plane
+### 15.7 Add Ground Plane
 
 1. Select **Bottom Copper** layer
 2. Draw copper zone covering entire board
 3. Set net: GND
 
-### 13.8 Add Antenna Keep-Out
+### 15.8 Add Antenna Keep-Out
 
 1. On **Top Copper** layer
 2. Draw keep-out zone around ESP32 antenna area
@@ -379,7 +524,7 @@ Bottom-right: Encoder (J5), UART (J11)
 
 ---
 
-## Step 14: Run DRC
+## Step 16: Run DRC
 
 1. Click **Design → Check DRC**
 2. Fix all errors
@@ -387,14 +532,14 @@ Bottom-right: Encoder (J5), UART (J11)
 
 ---
 
-## Step 15: Order from JLCPCB
+## Step 17: Order from JLCPCB
 
-### 15.1 Generate Manufacturing Files
+### 17.1 Generate Manufacturing Files
 
 1. Click **Fabrication → PCB Fabrication File (Gerber)**
 2. Files are automatically compatible with JLCPCB
 
-### 15.2 Order PCB
+### 17.2 Order PCB
 
 1. Click **Fabrication → One-Click Order PCB/SMT**
 2. Or go to https://jlcpcb.com
@@ -406,7 +551,7 @@ Bottom-right: Encoder (J5), UART (J11)
    - Thickness: 1.6mm
    - Surface: HASL Lead-Free
 
-### 15.3 Order with SMT Assembly (Optional)
+### 17.3 Order with SMT Assembly (Optional)
 
 1. Enable **SMT Assembly**
 2. Select **Top Side**

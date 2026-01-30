@@ -1,33 +1,36 @@
 # ESP32-S3 Master PCB - Netlist for EasyEDA
 # Format: NET_NAME: PIN1, PIN2, PIN3, ...
 # Use this to wire the schematic in EasyEDA
+#
+# Updated: 2025-01-30
+# Includes: RPM Input, VSS Input, MCP23017 Encoder Mux, SPI Slave CS Pull-up
 
 # ============================================================================
 # POWER NETS
 # ============================================================================
 
-+12V: J1.1, D1.A, U2.VIN, U3.8, D2.K
++12V: J1.1, D1.A, U2.VIN, U3.8, D2.K, J4.3
 
-+3V3: U2.OUT, U1.3V3, U1.3V3_2, MCP2515.VCC, J3.1, J5.4, J7.5, J9.3V3, J10.1, J11.2, C3.1, C4.1, C5.1, C6.1, C7.1, R_EN.1, R_IO0.1, R_ENC_CLK.1, R_ENC_DT.1, R_ENC_SW.1, R_SD_CS.1, R_SD_MOSI.1, R_SD_SCK.1, R_SD_MISO.1, R_SD_CD.1
++3V3: U2.OUT, U1.3V3, U1.3V3_2, J3.1, J7.5, J8.VDD, J9.3V3, J10.1, J11.2, J14.4, J15.4, J16.4, J17.4, J18.4, C3.1, C4.1, C5.1, C6.1, C7.1, C8.1, C9.1, C14.1, C16.1, R6.1, R7.1, R12.1, R13.1, R14.1, R15.1, R16.1, R21.1, R22.1, R24.1, R25.1, R26.1, U6.8, U7.9, U7.18
 
-+5V: J6.2, U3.OUT_BUFFERED
++5V: J6.2
 
-GND: J1.2, D1.K, D2.A, U2.GND, U3.4, U1.GND, U1.GND_2, U1.GND_3, MCP2515.GND, J2.GND, J3.2, J4.4, J5.5, J6.3, J7.6, J8.GND, J9.GND, J10.3, J10.5, J10.9, J11.1, C1.2, C2.2, C3.2, C4.2, C5.2, C6.2, C7.2, C8.2, C_USB.2, C_RC.2, R_GAIN_GND.2, R_CC1.2, R_CC2.2, SW1.2, SW2.2
+GND: J1.2, D1.K, D2.A, U2.GND, U3.4, U4.2, U5.3, U6.1, U6.4, U7.10, U7.15, U7.16, U7.17, U1.GND, U1.GND_2, U1.GND_3, J2.GND, J3.2, J4.4, J6.3, J7.6, J8.GND, J9.GND, J10.3, J10.5, J10.9, J11.1, J12.2, J13.2, J14.5, J15.5, J16.5, J17.5, J18.5, C1.2, C2.2, C3.2, C4.2, C5.2, C6.2, C7.2, C8.2, C9.2, C10.2, C11.2, C12.2, C13.2, C14.2, C15.2, C16.2, R2.2, R5.2, R8.2, R9.2, D4.2, SW1.2, SW2.2
 
-VBUS: J2.VBUS, C_USB.1
+VBUS: J2.VBUS, C11.1, U4.5
 
 # ============================================================================
 # USB INTERFACE (Native USB on ESP32-S3)
 # ============================================================================
 
-USB_DP: J2.D+, R_USB_DP.1
-USB_DP_ESP: R_USB_DP.2, U1.GPIO20
+USB_DP: J2.D+, R10.1
+USB_DP_ESP: R10.2, U1.GPIO20, U4.1
 
-USB_DM: J2.D-, R_USB_DM.1
-USB_DM_ESP: R_USB_DM.2, U1.GPIO19
+USB_DM: J2.D-, R11.1
+USB_DM_ESP: R11.2, U1.GPIO19, U4.3
 
-CC1: J2.CC1, R_CC1.1
-CC2: J2.CC2, R_CC2.1
+CC1: J2.CC1, R8.1
+CC2: J2.CC2, R9.1
 
 # ============================================================================
 # POWER SUPPLY (12V to 3.3V Buck Converter)
@@ -35,48 +38,40 @@ CC2: J2.CC2, R_CC2.1
 
 # MP2359 Buck Converter
 SW_NODE: U2.SW, L1.1
-FB_NODE: U2.FB, R_FB_TOP.2, R_FB_BOT.1
-VOUT_PRE: L1.2, C2.1, R_FB_TOP.1
+FB_NODE: U2.FB, R1.2, R2.1
+VOUT_PRE: L1.2, C2.1, R1.1
 
-# Feedback divider: 33K top, 10K bottom for 3.3V output
+# Feedback divider: 33K top (R1), 10K bottom (R2) for 3.3V output
 # Vout = 0.6V * (1 + R_TOP/R_BOT) = 0.6 * (1 + 33/10) = 2.58V
-# Adjust R_FB_TOP to 36K for exactly 3.3V: 0.6 * (1 + 36/10) = 2.76V
-# Or use 33K/10K and adjust
+# Note: Actual values may need adjustment for precise 3.3V
 
 # ============================================================================
 # MCP2515 CAN CONTROLLER (SPI1 - FSPI)
 # ============================================================================
 
-MCP_SCK: U1.GPIO12, MCP2515.SCK, J3.6
-MCP_MOSI: U1.GPIO11, MCP2515.SI, J3.5
-MCP_MISO: U1.GPIO13, MCP2515.SO, J3.4
-MCP_CS: U1.GPIO10, MCP2515.CS, J3.3
-MCP_INT: U1.GPIO9, MCP2515.INT, J3.7
+# MCP2515 module header (J3) - module includes TJA1050 transceiver
+MCP_SCK: U1.GPIO12, J3.6
+MCP_MOSI: U1.GPIO11, J3.5
+MCP_MISO: U1.GPIO13, J3.4
+MCP_CS: U1.GPIO10, J3.3
+MCP_INT: U1.GPIO9, J3.7
 
 # CAN Bus connector (directly from MCP2515 module which includes TJA1050)
-CANH: J4.1, MCP2515.CANH
-CANL: J4.2, MCP2515.CANL
-CAN_12V: J4.3
-
-# ============================================================================
-# ROTARY ENCODER (KY-040)
-# ============================================================================
-
-ENC_CLK: U1.GPIO4, R_ENC_CLK.2, J5.1
-ENC_DT: U1.GPIO5, R_ENC_DT.2, J5.2
-ENC_SW: U1.GPIO6, R_ENC_SW.2, J5.3
+CANH: J4.1
+CANL: J4.2
 
 # ============================================================================
 # PWM OUTPUT (RC Filter + Op-Amp)
 # ============================================================================
 
-PWM_RAW: U1.GPIO7, R_RC.1
-PWM_FILTERED: R_RC.2, C_RC.1, U3.3
-PWM_AMPLIFIED: U3.1, R_FB_OPAMP.1, J6.1
-OPAMP_FB: R_FB_OPAMP.2, R_GAIN_GND.1, U3.2
+# RC filter: R3 (10K) + C10 (1uF) = 15.9Hz cutoff
+PWM_RAW: U1.GPIO7, R3.1
+PWM_FILTERED: R3.2, C10.1, U3.3
 
-# Op-amp gain: 1 + (R_FB/R_GND) = 1 + (5.1K/10K) = 1.51
+# Op-amp amplifier: LM358, Gain = 1 + (R4/R5) = 1 + (5.1K/10K) = 1.51
 # Input 0-3.3V -> Output 0-5V
+PWM_AMPLIFIED: U3.1, R4.1, J6.1
+OPAMP_FB: R4.2, R5.1, U3.2
 
 # ============================================================================
 # SPI SLAVE COMMUNICATION (SPI2 - HSPI)
@@ -85,20 +80,24 @@ OPAMP_FB: R_FB_OPAMP.2, R_GAIN_GND.1, U3.2
 COMM_MOSI: U1.GPIO2, J7.1
 COMM_MISO: U1.GPIO3, J7.2
 COMM_SCK: U1.GPIO14, J7.3
-COMM_CS: U1.GPIO21, J7.4
+COMM_CS: U1.GPIO21, R26.2, J7.4
+
+# Note: R26 (10K) keeps CS HIGH during ESP32 boot/reset, preventing the slave
+# from receiving spurious SPI data while the master GPIO is floating.
 
 # ============================================================================
 # SD CARD (SPI Mode)
 # ============================================================================
 
-SD_CS: U1.GPIO15, R_SD_CS.2, J8.CS
-SD_MOSI: U1.GPIO16, R_SD_MOSI.2, J8.MOSI
-SD_SCK: U1.GPIO17, R_SD_SCK.2, J8.SCK
-SD_MISO: U1.GPIO18, R_SD_MISO.2, J8.MISO
-SD_CD: U1.GPIO8, R_SD_CD.2, J8.CD
+# Pull-ups on all SD lines for reliable operation
+SD_CS: U1.GPIO15, R12.2, J8.CS
+SD_MOSI: U1.GPIO16, R13.2, J8.MOSI
+SD_SCK: U1.GPIO17, R14.2, J8.SCK
+SD_MISO: U1.GPIO18, R15.2, J8.MISO
+SD_CD: U1.GPIO8, R16.2, J8.CD
 
 # ============================================================================
-# JTAG DEBUG INTERFACE
+# JTAG DEBUG INTERFACE (J10 - ARM Cortex 2x5 1.27mm)
 # ============================================================================
 
 JTAG_TCK: U1.GPIO39, J10.4
@@ -107,7 +106,7 @@ JTAG_TDI: U1.GPIO41, J10.8
 JTAG_TMS: U1.GPIO42, J10.2
 
 # ============================================================================
-# UART DEBUG INTERFACE
+# UART DEBUG INTERFACE (J11 - 1x6 Header)
 # ============================================================================
 
 UART_TX: U1.GPIO43, J11.3
@@ -117,39 +116,177 @@ UART_RX: U1.GPIO44, J11.4
 # BOOT/RESET CONTROL
 # ============================================================================
 
-EN: U1.EN, R_EN.2, C_EN.1, SW1.1, J10.10, J11.5
-IO0: U1.GPIO0, R_IO0.2, C_IO0.1, SW2.1, J11.6
+# EN pin with 10K pull-up (R6), 100nF filter (C12), reset button (SW1)
+EN: U1.EN, R6.2, C12.1, SW1.1, J10.10, J11.5
+
+# GPIO0 (boot strapping) with 10K pull-up (R7), 100nF filter (C13), boot button (SW2)
+IO0: U1.GPIO0, R7.2, C13.1, SW2.1, J11.6
 
 # ============================================================================
-# ACTIVE CONNECTIONS SUMMARY
+# RPM INPUT (12V Square Wave via Optocoupler)
+# ============================================================================
+
+# Input connector J12 (12V square wave from engine tach)
+# Optocoupler provides galvanic isolation from vehicle electrical system
+
+# LED drive circuit: R20 (2.2K) limits current
+# I_LED = (12V - 1.2V) / 2.2K = ~4.9mA (safe for PC817)
+RPM_12V_IN: J12.1, R20.1
+RPM_LED_CATHODE: R20.2, U5.1
+RPM_PROTECTION: D3.A, J12.2
+RPM_LED_ANODE: U5.2, D3.K
+
+# Optocoupler phototransistor output with 10K pull-up (R21)
+# Signal is inverted: 12V HIGH input = GPIO LOW output
+RPM_COLLECTOR: U5.4, R21.2, U1.GPIO1
+RPM_EMITTER: U5.3
+
+# Note: D3 (1N4148) provides reverse polarity protection for the optocoupler LED
+
+# ============================================================================
+# VSS INPUT (Vehicle Speed Sensor - GM 700R4 VR Sensor)
+# ============================================================================
+
+# LM1815 Variable Reluctance sensor interface
+# Converts AC sine wave from transmission speed sensor to digital pulses
+# 8000 pulses per mile for GM 700R4
+
+# VR sensor input from J13 with optional input filter (C15) and TVS protection (D4)
+VSS_VR_POS: J13.1, U6.3, C15.1, D4.1
+VSS_VR_NEG: J13.2, U6.4
+
+# LM1815 threshold timing resistor (R23 = 200K)
+# Higher values = slower adaptation, better noise immunity
+VSS_RSET: U6.6, R23.1
+VSS_RSET_GND: R23.2
+
+# LM1815 output with 10K pull-up (R22) - open collector output
+VSS_OUTPUT: U6.7, R22.2, U1.GPIO38
+
+# Power supply decoupling (C14 = 100nF)
+VSS_VCC: U6.8, C14.1
+
+# ============================================================================
+# MCP23017 I2C GPIO EXPANDER (Encoder Multiplexer)
+# ============================================================================
+
+# I2C bus with 10K pull-ups (R24, R25) for 400kHz Fast mode
+I2C_SDA: U1.GPIO47, U7.13, R24.2
+I2C_SCL: U1.GPIO48, U7.12, R25.2
+
+# Interrupt output (directly to ESP32, directly connected no external pull-up needed)
+MCP23017_INT: U1.GPIO45, U7.20
+
+# MCP23017 address pins tied to GND for address 0x20
+# A0=GND, A1=GND, A2=GND -> Address = 0b0100000 = 0x20
+MCP23017_A0: U7.15
+MCP23017_A1: U7.16
+MCP23017_A2: U7.17
+
+# MCP23017 Reset tied HIGH (active LOW reset)
+MCP23017_RESET: U7.18
+
+# VCC bypass capacitor (C16 = 100nF)
+MCP23017_VCC: U7.9, C16.1
+
+# ============================================================================
+# ROTARY ENCODERS (via MCP23017)
+# ============================================================================
+
+# Encoder 1 (J14) - Power Steering Speed Control
+# CLK=GPA0, DT=GPA1, SW=GPA2
+ENC1_CLK: U7.21, J14.1
+ENC1_DT: U7.22, J14.2
+ENC1_SW: U7.23, J14.3
+
+# Encoder 2 (J15) - Future Use
+# CLK=GPA3, DT=GPA4, SW=GPA5
+ENC2_CLK: U7.24, J15.1
+ENC2_DT: U7.25, J15.2
+ENC2_SW: U7.26, J15.3
+
+# Encoder 3 (J16) - Future Use
+# CLK=GPA6, DT=GPA7, SW=GPB0
+ENC3_CLK: U7.27, J16.1
+ENC3_DT: U7.28, J16.2
+ENC3_SW: U7.1, J16.3
+
+# Encoder 4 (J17) - Future Use
+# CLK=GPB1, DT=GPB2, SW=GPB3
+ENC4_CLK: U7.2, J17.1
+ENC4_DT: U7.3, J17.2
+ENC4_SW: U7.4, J17.3
+
+# Encoder 5 (J18) - Future Use
+# CLK=GPB4, DT=GPB5, SW=GPB6
+ENC5_CLK: U7.5, J18.1
+ENC5_DT: U7.6, J18.2
+ENC5_SW: U7.7, J18.3
+
+# GPB7 (U7.8) unused/available
+
+# Encoder connector pinout (J14-J18): 1=CLK, 2=DT, 3=SW, 4=3V3, 5=GND
+# Internal MCP23017 pull-ups (100K) enabled in firmware - no external pull-ups needed
+
+# ============================================================================
+# ESP32-S3 GPIO SUMMARY
 # ============================================================================
 #
-# ESP32-S3 GPIO Usage:
-# GPIO0  - Boot strapping (directly to switch and UART header)
-# GPIO2  - COMM_SPI_MOSI (to slave)
-# GPIO3  - COMM_SPI_MISO (from slave)
-# GPIO4  - Encoder CLK
-# GPIO5  - Encoder DT
-# GPIO6  - Encoder SW
-# GPIO7  - PWM output
-# GPIO8  - SD Card Detect
-# GPIO9  - MCP2515 INT
-# GPIO10 - MCP2515 CS
-# GPIO11 - MCP2515 MOSI
-# GPIO12 - MCP2515 SCK
-# GPIO13 - MCP2515 MISO
-# GPIO14 - COMM_SPI_SCK (to slave)
-# GPIO15 - SD_CS
-# GPIO16 - SD_MOSI
-# GPIO17 - SD_SCK
-# GPIO18 - SD_MISO
-# GPIO19 - USB D-
-# GPIO20 - USB D+
-# GPIO21 - COMM_SPI_CS (to slave)
-# GPIO39 - JTAG TCK
-# GPIO40 - JTAG TDO
-# GPIO41 - JTAG TDI
-# GPIO42 - JTAG TMS
-# GPIO43 - UART TX
-# GPIO44 - UART RX
-# EN     - Reset
+# GPIO0  - IO0 (Boot strapping, button SW2, UART header)
+# GPIO1  - RPM_IN (12V via optocoupler U5)
+# GPIO2  - COMM_SPI_MOSI (to slave J7)
+# GPIO3  - COMM_SPI_MISO (from slave J7)
+# GPIO4  - Available (formerly direct encoder)
+# GPIO5  - Available (formerly direct encoder)
+# GPIO6  - Available (formerly direct encoder)
+# GPIO7  - PWM_OUT (RC filter + op-amp to J6)
+# GPIO8  - SD_CD (SD card detect)
+# GPIO9  - MCP2515_INT (CAN interrupt)
+# GPIO10 - MCP2515_CS (CAN chip select)
+# GPIO11 - MCP2515_MOSI (CAN SPI)
+# GPIO12 - MCP2515_SCK (CAN SPI)
+# GPIO13 - MCP2515_MISO (CAN SPI)
+# GPIO14 - COMM_SPI_SCK (to slave J7)
+# GPIO15 - SD_CS (SD card)
+# GPIO16 - SD_MOSI (SD card)
+# GPIO17 - SD_SCK (SD card)
+# GPIO18 - SD_MISO (SD card)
+# GPIO19 - USB_D- (native USB)
+# GPIO20 - USB_D+ (native USB)
+# GPIO21 - COMM_SPI_CS (to slave J7, with R26 pull-up)
+# GPIO26-32 - Reserved for Flash (DO NOT USE)
+# GPIO33-37 - Reserved for PSRAM (DO NOT USE)
+# GPIO38 - VSS_IN (vehicle speed via LM1815)
+# GPIO39 - JTAG_TCK
+# GPIO40 - JTAG_TDO
+# GPIO41 - JTAG_TDI
+# GPIO42 - JTAG_TMS
+# GPIO43 - UART_TX (debug)
+# GPIO44 - UART_RX (debug)
+# GPIO45 - MCP23017_INT (encoder interrupt)
+# GPIO46 - Available (expansion)
+# GPIO47 - I2C_SDA (MCP23017)
+# GPIO48 - I2C_SCL (MCP23017)
+# EN     - Reset (button SW1, JTAG/UART headers)
+
+# ============================================================================
+# CONNECTOR SUMMARY
+# ============================================================================
+#
+# J1  - 12V Power Input (Screw Terminal 2P)
+# J2  - USB-C (Programming/Debug)
+# J3  - MCP2515 CAN Module (JST-XH 7P)
+# J4  - CAN Bus (JST-GH 4P: CANH/CANL/12V/GND)
+# J6  - PWM Output (JST-PH 3P: SIG/5V/GND)
+# J7  - SPI Slave Comm (JST-GH 6P: MOSI/MISO/SCK/CS/3V3/GND)
+# J8  - Micro SD Card Slot
+# J9  - Expansion Header (2x7 2.54mm)
+# J10 - JTAG Debug (ARM 2x5 1.27mm)
+# J11 - UART Debug (1x6 2.54mm RA)
+# J12 - RPM Input (JST-PH 2P: SIG/GND)
+# J13 - VSS Input (JST-PH 2P: VR+/VR-)
+# J14 - Encoder 1 - Power Steering (JST-XH 5P)
+# J15 - Encoder 2 - Future (JST-XH 5P)
+# J16 - Encoder 3 - Future (JST-XH 5P)
+# J17 - Encoder 4 - Future (JST-XH 5P)
+# J18 - Encoder 5 - Future (JST-XH 5P)
