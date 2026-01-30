@@ -1,0 +1,1115 @@
+{
+  "$comment": "REFERENCE DATA ONLY - This file cannot be imported into EasyEDA Pro. Use BOM_EasyEDA.csv and schematic_netlist.txt to create the project manually, or import from KiCad.",
+  "$schema": "custom-reference-schema",
+  "docType": "reference",
+  "editorVersion": "N/A",
+  "title": "ESP32-S3-Master-PCB",
+  "description": "Machine-readable BOM and netlist data for tooling/reference purposes",
+  "version": "2.0",
+  "createdAt": "2025-01-30",
+  "updatedAt": "2025-01-30",
+  "projectSettings": {
+    "units": "mm",
+    "gridSize": 0.1,
+    "snapSize": 0.05
+  },
+  "bom": [
+    {
+      "ref": "U1",
+      "name": "ESP32-S3-WROOM-1-N16R8",
+      "footprint": "ESP32-S3-WROOM-1",
+      "quantity": 1,
+      "manufacturerPart": "ESP32-S3-WROOM-1-N16R8",
+      "lcsc": "C2913202",
+      "description": "ESP32-S3 WiFi+BLE Module 16MB Flash 8MB PSRAM",
+      "group": "MCU"
+    },
+    {
+      "ref": "U2",
+      "name": "MP2359DJ-LF-Z",
+      "footprint": "SOT-23-6",
+      "quantity": 1,
+      "manufacturerPart": "MP2359DJ-LF-Z",
+      "lcsc": "C14259",
+      "description": "1.2A 24V 1.4MHz Step-Down Converter",
+      "group": "Power"
+    },
+    {
+      "ref": "U3",
+      "name": "LM358DR",
+      "footprint": "SOIC-8",
+      "quantity": 1,
+      "manufacturerPart": "LM358DR",
+      "lcsc": "C7950",
+      "description": "Dual Operational Amplifier",
+      "group": "Analog"
+    },
+    {
+      "ref": "U4",
+      "name": "USBLC6-2SC6",
+      "footprint": "SOT-23-6",
+      "quantity": 1,
+      "manufacturerPart": "USBLC6-2SC6",
+      "lcsc": "C7519",
+      "description": "USB ESD Protection",
+      "group": "Protection"
+    },
+    {
+      "ref": "U5",
+      "name": "PC817C",
+      "footprint": "DIP-4",
+      "quantity": 1,
+      "manufacturerPart": "PC817C",
+      "lcsc": "C66463",
+      "description": "Optocoupler Phototransistor Output",
+      "group": "RPM Input"
+    },
+    {
+      "ref": "U6",
+      "name": "LM1815M",
+      "footprint": "SOIC-8",
+      "quantity": 1,
+      "manufacturerPart": "LM1815M/NOPB",
+      "lcsc": "C129587",
+      "description": "Variable Reluctance Sensor Interface",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "U7",
+      "name": "MCP23017-E/SO",
+      "footprint": "SOIC-28",
+      "quantity": 1,
+      "manufacturerPart": "MCP23017-E/SO",
+      "lcsc": "C47023",
+      "description": "16-Bit I2C GPIO Expander",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "D1",
+      "name": "SS34",
+      "footprint": "SMA",
+      "quantity": 1,
+      "manufacturerPart": "SS34",
+      "lcsc": "C8678",
+      "description": "3A 40V Schottky Diode",
+      "group": "Protection"
+    },
+    {
+      "ref": "D2",
+      "name": "SMBJ15A",
+      "footprint": "SMB",
+      "quantity": 1,
+      "manufacturerPart": "SMBJ15A",
+      "lcsc": "C123769",
+      "description": "15V TVS Diode",
+      "group": "Protection"
+    },
+    {
+      "ref": "D3",
+      "name": "1N4148W",
+      "footprint": "SOD-123",
+      "quantity": 1,
+      "manufacturerPart": "1N4148W",
+      "lcsc": "C81598",
+      "description": "75V 150mA Switching Diode",
+      "group": "RPM Input"
+    },
+    {
+      "ref": "D4",
+      "name": "P6KE33CA",
+      "footprint": "SMB",
+      "quantity": 1,
+      "manufacturerPart": "P6KE33CA",
+      "lcsc": "C108380",
+      "description": "33V TVS Bidirectional",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "L1",
+      "name": "10uH",
+      "footprint": "IND-SMD_4x4",
+      "quantity": 1,
+      "manufacturerPart": "SWPA4030S100MT",
+      "lcsc": "C167134",
+      "description": "10uH 1.3A Power Inductor",
+      "group": "Power"
+    },
+    {
+      "ref": "C1",
+      "name": "22uF/25V",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21A226MQQNNNE",
+      "lcsc": "C45783",
+      "description": "22uF 25V X5R MLCC",
+      "group": "Power"
+    },
+    {
+      "ref": "C2",
+      "name": "22uF/10V",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21A226MQCLRNC",
+      "lcsc": "C45783",
+      "description": "22uF 10V X5R MLCC",
+      "group": "Power"
+    },
+    {
+      "ref": "C3",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF 50V X7R MLCC",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C4",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF 50V X7R MLCC",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C5",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF 50V X7R MLCC",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C6",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF 50V X7R MLCC",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C7",
+      "name": "10uF",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21A106KAYNNNE",
+      "lcsc": "C15850",
+      "description": "10uF 10V X5R MLCC",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C8",
+      "name": "10uF",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21A106KAYNNNE",
+      "lcsc": "C15850",
+      "description": "10uF 10V X5R MLCC (SD Card)",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C9",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF SD Card Decoupling",
+      "group": "Decoupling"
+    },
+    {
+      "ref": "C10",
+      "name": "1uF",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21B105KAFNNNE",
+      "lcsc": "C28323",
+      "description": "1uF 50V X7R (RC Filter)",
+      "group": "Analog"
+    },
+    {
+      "ref": "C11",
+      "name": "10uF",
+      "footprint": "0805",
+      "quantity": 1,
+      "manufacturerPart": "CL21A106KAYNNNE",
+      "lcsc": "C15850",
+      "description": "10uF USB VBUS",
+      "group": "USB"
+    },
+    {
+      "ref": "C12",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF EN filter",
+      "group": "Boot"
+    },
+    {
+      "ref": "C13",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF IO0 filter",
+      "group": "Boot"
+    },
+    {
+      "ref": "C14",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF LM1815 VCC Bypass",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "C15",
+      "name": "1nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B102KB5NNNC",
+      "lcsc": "C1523",
+      "description": "1nF VSS Input Filter (optional)",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "C16",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF MCP23017 VCC Bypass",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "R1",
+      "name": "33K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF3302TCE",
+      "lcsc": "C25741",
+      "description": "33K 1% FB Divider Top",
+      "group": "Power"
+    },
+    {
+      "ref": "R2",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% FB Divider Bottom",
+      "group": "Power"
+    },
+    {
+      "ref": "R3",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% RC Filter",
+      "group": "Analog"
+    },
+    {
+      "ref": "R4",
+      "name": "5.1K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF5101TCE",
+      "lcsc": "C25905",
+      "description": "5.1K 1% Op-Amp Feedback",
+      "group": "Analog"
+    },
+    {
+      "ref": "R5",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% Op-Amp Gain to GND",
+      "group": "Analog"
+    },
+    {
+      "ref": "R6",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K EN Pull-up",
+      "group": "Boot"
+    },
+    {
+      "ref": "R7",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K IO0 Pull-up",
+      "group": "Boot"
+    },
+    {
+      "ref": "R8",
+      "name": "5.1K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF5101TCE",
+      "lcsc": "C25905",
+      "description": "5.1K USB CC1",
+      "group": "USB"
+    },
+    {
+      "ref": "R9",
+      "name": "5.1K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF5101TCE",
+      "lcsc": "C25905",
+      "description": "5.1K USB CC2",
+      "group": "USB"
+    },
+    {
+      "ref": "R10",
+      "name": "22R",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF220JTCE",
+      "lcsc": "C25092",
+      "description": "22R USB D+ Series",
+      "group": "USB"
+    },
+    {
+      "ref": "R11",
+      "name": "22R",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF220JTCE",
+      "lcsc": "C25092",
+      "description": "22R USB D- Series",
+      "group": "USB"
+    },
+    {
+      "ref": "R12",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K SD CS Pull-up",
+      "group": "SD Card"
+    },
+    {
+      "ref": "R13",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K SD MOSI Pull-up",
+      "group": "SD Card"
+    },
+    {
+      "ref": "R14",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K SD SCK Pull-up",
+      "group": "SD Card"
+    },
+    {
+      "ref": "R15",
+      "name": "47K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF4702TCE",
+      "lcsc": "C25792",
+      "description": "47K SD MISO Pull-up",
+      "group": "SD Card"
+    },
+    {
+      "ref": "R16",
+      "name": "47K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF4702TCE",
+      "lcsc": "C25792",
+      "description": "47K SD CD Pull-up",
+      "group": "SD Card"
+    },
+    {
+      "ref": "R20",
+      "name": "2.2K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF2201TCE",
+      "lcsc": "C25879",
+      "description": "2.2K 1% LED Current Limit",
+      "group": "RPM Input"
+    },
+    {
+      "ref": "R21",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% Collector Pull-up",
+      "group": "RPM Input"
+    },
+    {
+      "ref": "R22",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% LM1815 Output Pull-up",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "R23",
+      "name": "200K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF2003TCE",
+      "lcsc": "C25811",
+      "description": "200K 1% LM1815 RSET",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "R24",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% I2C SDA Pull-up",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "R25",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% I2C SCL Pull-up",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "R26",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% SPI Slave CS Pull-up",
+      "group": "SPI Slave"
+    },
+    {
+      "ref": "J1",
+      "name": "Screw Terminal 2P",
+      "footprint": "P5.08mm",
+      "quantity": 1,
+      "manufacturerPart": "DT-125-5.08-02P",
+      "lcsc": "C8463",
+      "description": "5.08mm 2-pos Screw Terminal",
+      "group": "Power"
+    },
+    {
+      "ref": "J2",
+      "name": "USB-C",
+      "footprint": "USB-C-SMD-16P",
+      "quantity": 1,
+      "manufacturerPart": "USB4110-GF-A",
+      "lcsc": "C2765186",
+      "description": "USB Type-C 2.0 Receptacle",
+      "group": "USB"
+    },
+    {
+      "ref": "J3",
+      "name": "JST-XH 7P",
+      "footprint": "XH-7A",
+      "quantity": 1,
+      "manufacturerPart": "B7B-XH-A",
+      "lcsc": "C161872",
+      "description": "JST XH 7-pin Vertical Header",
+      "group": "CAN"
+    },
+    {
+      "ref": "J4",
+      "name": "JST-GH 4P",
+      "footprint": "GH-4P-SMD",
+      "quantity": 1,
+      "manufacturerPart": "SM04B-GHS-TB",
+      "lcsc": "C160404",
+      "description": "JST GH 4-pin SMD Header",
+      "group": "CAN"
+    },
+    {
+      "ref": "J6",
+      "name": "JST-PH 3P",
+      "footprint": "PH-3A",
+      "quantity": 1,
+      "manufacturerPart": "B3B-PH-K-S",
+      "lcsc": "C131337",
+      "description": "JST PH 3-pin Vertical Header",
+      "group": "PWM"
+    },
+    {
+      "ref": "J7",
+      "name": "JST-GH 6P",
+      "footprint": "GH-6P-SMD",
+      "quantity": 1,
+      "manufacturerPart": "SM06B-GHS-TB",
+      "lcsc": "C160408",
+      "description": "JST GH 6-pin SMD Header",
+      "group": "SPI Slave"
+    },
+    {
+      "ref": "J8",
+      "name": "Micro SD",
+      "footprint": "MICRO-SD-PUSH",
+      "quantity": 1,
+      "manufacturerPart": "5040770891",
+      "lcsc": "C111196",
+      "description": "Micro SD Push-Push Slot",
+      "group": "SD Card"
+    },
+    {
+      "ref": "J9",
+      "name": "Header 2x7",
+      "footprint": "HDR-2x7-2.54",
+      "quantity": 1,
+      "manufacturerPart": "2.54-2x7P",
+      "lcsc": "C492405",
+      "description": "Pin Header 2x7 2.54mm",
+      "group": "Expansion"
+    },
+    {
+      "ref": "J10",
+      "name": "ARM Debug 2x5",
+      "footprint": "HDR-2x5-1.27",
+      "quantity": 1,
+      "manufacturerPart": "1.27-2x5P",
+      "lcsc": "C2889983",
+      "description": "ARM Cortex Debug 1.27mm",
+      "group": "Debug"
+    },
+    {
+      "ref": "J11",
+      "name": "Header 1x6 RA",
+      "footprint": "HDR-1x6-2.54-RA",
+      "quantity": 1,
+      "manufacturerPart": "2.54-1x6P-RA",
+      "lcsc": "C2977595",
+      "description": "Pin Header 1x6 Right Angle",
+      "group": "Debug"
+    },
+    {
+      "ref": "J12",
+      "name": "JST-PH 2P",
+      "footprint": "PH-2A",
+      "quantity": 1,
+      "manufacturerPart": "B2B-PH-K-S",
+      "lcsc": "C131338",
+      "description": "JST PH 2-pin Vertical Header",
+      "group": "RPM Input"
+    },
+    {
+      "ref": "J13",
+      "name": "JST-PH 2P",
+      "footprint": "PH-2A",
+      "quantity": 1,
+      "manufacturerPart": "B2B-PH-K-S",
+      "lcsc": "C131338",
+      "description": "JST PH 2-pin Vertical Header",
+      "group": "VSS Input"
+    },
+    {
+      "ref": "J14",
+      "name": "JST-XH 5P",
+      "footprint": "XH-5A",
+      "quantity": 1,
+      "manufacturerPart": "B5B-XH-A",
+      "lcsc": "C157991",
+      "description": "JST XH 5-pin Encoder 1 (Power Steering)",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "J15",
+      "name": "JST-XH 5P",
+      "footprint": "XH-5A",
+      "quantity": 1,
+      "manufacturerPart": "B5B-XH-A",
+      "lcsc": "C157991",
+      "description": "JST XH 5-pin Encoder 2 (Future)",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "J16",
+      "name": "JST-XH 5P",
+      "footprint": "XH-5A",
+      "quantity": 1,
+      "manufacturerPart": "B5B-XH-A",
+      "lcsc": "C157991",
+      "description": "JST XH 5-pin Encoder 3 (Future)",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "J17",
+      "name": "JST-XH 5P",
+      "footprint": "XH-5A",
+      "quantity": 1,
+      "manufacturerPart": "B5B-XH-A",
+      "lcsc": "C157991",
+      "description": "JST XH 5-pin Encoder 4 (Future)",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "J18",
+      "name": "JST-XH 5P",
+      "footprint": "XH-5A",
+      "quantity": 1,
+      "manufacturerPart": "B5B-XH-A",
+      "lcsc": "C157991",
+      "description": "JST XH 5-pin Encoder 5 (Future)",
+      "group": "Encoder Mux"
+    },
+    {
+      "ref": "SW1",
+      "name": "Reset",
+      "footprint": "SW-SMD-6x6",
+      "quantity": 1,
+      "manufacturerPart": "K2-1102DP-C4SW-04",
+      "lcsc": "C318884",
+      "description": "6x6mm Tactile Switch",
+      "group": "Boot"
+    },
+    {
+      "ref": "SW2",
+      "name": "Boot",
+      "footprint": "SW-SMD-6x6",
+      "quantity": 1,
+      "manufacturerPart": "K2-1102DP-C4SW-04",
+      "lcsc": "C318884",
+      "description": "6x6mm Tactile Switch",
+      "group": "Boot"
+    }
+  ],
+  "nets": [
+    {"name": "GND", "class": "power"},
+    {"name": "+3V3", "class": "power"},
+    {"name": "+12V", "class": "power"},
+    {"name": "+5V", "class": "power"},
+    {"name": "VBUS", "class": "power"},
+    {"name": "USB_D+", "class": "signal"},
+    {"name": "USB_D-", "class": "signal"},
+    {"name": "CC1", "class": "signal"},
+    {"name": "CC2", "class": "signal"},
+    {"name": "COMM_MOSI", "class": "signal"},
+    {"name": "COMM_MISO", "class": "signal"},
+    {"name": "COMM_SCK", "class": "signal"},
+    {"name": "COMM_CS", "class": "signal"},
+    {"name": "MCP_MOSI", "class": "signal"},
+    {"name": "MCP_MISO", "class": "signal"},
+    {"name": "MCP_SCK", "class": "signal"},
+    {"name": "MCP_CS", "class": "signal"},
+    {"name": "MCP_INT", "class": "signal"},
+    {"name": "I2C_SDA", "class": "signal"},
+    {"name": "I2C_SCL", "class": "signal"},
+    {"name": "MCP23017_INT", "class": "signal"},
+    {"name": "PWM_OUT", "class": "signal"},
+    {"name": "PWM_FILTERED", "class": "signal"},
+    {"name": "PWM_ANALOG", "class": "signal"},
+    {"name": "OPAMP_FB", "class": "signal"},
+    {"name": "SD_CS", "class": "signal"},
+    {"name": "SD_MOSI", "class": "signal"},
+    {"name": "SD_SCK", "class": "signal"},
+    {"name": "SD_MISO", "class": "signal"},
+    {"name": "SD_CD", "class": "signal"},
+    {"name": "JTAG_TCK", "class": "signal"},
+    {"name": "JTAG_TDO", "class": "signal"},
+    {"name": "JTAG_TDI", "class": "signal"},
+    {"name": "JTAG_TMS", "class": "signal"},
+    {"name": "UART_TX", "class": "signal"},
+    {"name": "UART_RX", "class": "signal"},
+    {"name": "EN", "class": "signal"},
+    {"name": "IO0", "class": "signal"},
+    {"name": "CANH", "class": "signal"},
+    {"name": "CANL", "class": "signal"},
+    {"name": "RPM_IN", "class": "signal"},
+    {"name": "RPM_12V_IN", "class": "signal"},
+    {"name": "RPM_LED_CATHODE", "class": "signal"},
+    {"name": "VSS_IN", "class": "signal"},
+    {"name": "VSS_VR_IN", "class": "signal"},
+    {"name": "ENC1_CLK", "class": "signal"},
+    {"name": "ENC1_DT", "class": "signal"},
+    {"name": "ENC1_SW", "class": "signal"},
+    {"name": "ENC2_CLK", "class": "signal"},
+    {"name": "ENC2_DT", "class": "signal"},
+    {"name": "ENC2_SW", "class": "signal"},
+    {"name": "ENC3_CLK", "class": "signal"},
+    {"name": "ENC3_DT", "class": "signal"},
+    {"name": "ENC3_SW", "class": "signal"},
+    {"name": "ENC4_CLK", "class": "signal"},
+    {"name": "ENC4_DT", "class": "signal"},
+    {"name": "ENC4_SW", "class": "signal"},
+    {"name": "ENC5_CLK", "class": "signal"},
+    {"name": "ENC5_DT", "class": "signal"},
+    {"name": "ENC5_SW", "class": "signal"}
+  ],
+  "connections": [
+    {
+      "net": "GND",
+      "pins": [
+        "U1.GND", "U2.GND", "U3.4", "U4.GND", "U5.3", "U6.1", "U6.4", "U7.10",
+        "J1.2", "J2.GND", "J3.2", "J4.4", "J6.3", "J7.6", "J8.GND", "J9.GND",
+        "J10.3", "J10.5", "J10.9", "J11.1", "J12.2", "J13.2",
+        "J14.5", "J15.5", "J16.5", "J17.5", "J18.5",
+        "C1.2", "C2.2", "C3.2", "C4.2", "C5.2", "C6.2", "C7.2", "C8.2", "C9.2",
+        "C10.2", "C11.2", "C12.2", "C13.2", "C14.2", "C15.2", "C16.2",
+        "R2.2", "R5.2", "R8.2", "R9.2",
+        "D2.A", "SW1.2", "SW2.2"
+      ]
+    },
+    {
+      "net": "+3V3",
+      "pins": [
+        "U1.3V3", "U6.8", "U7.9",
+        "J3.1", "J7.5", "J9.3V3", "J10.1", "J11.2",
+        "J14.4", "J15.4", "J16.4", "J17.4", "J18.4",
+        "C3.1", "C4.1", "C5.1", "C6.1", "C7.1", "C8.1", "C9.1", "C14.1", "C16.1",
+        "R1.1", "R6.1", "R7.1", "R12.1", "R13.1", "R14.1", "R15.1", "R16.1",
+        "R21.1", "R22.1", "R24.1", "R25.1", "R26.1",
+        "U7.18"
+      ]
+    },
+    {
+      "net": "+12V",
+      "pins": ["J1.1", "D1.A", "U2.VIN", "U3.8", "D2.K", "J4.3"]
+    },
+    {
+      "net": "VBUS",
+      "pins": ["J2.VBUS", "C11.1", "U4.5"]
+    },
+    {
+      "net": "CC1",
+      "pins": ["J2.CC1", "R8.1"]
+    },
+    {
+      "net": "CC2",
+      "pins": ["J2.CC2", "R9.1"]
+    },
+    {
+      "net": "USB_D+",
+      "pins": ["J2.D+", "R10.1"]
+    },
+    {
+      "net": "USB_D-",
+      "pins": ["J2.D-", "R11.1"]
+    },
+    {
+      "net": "GPIO20",
+      "pins": ["U1.GPIO20", "R10.2", "U4.1"]
+    },
+    {
+      "net": "GPIO19",
+      "pins": ["U1.GPIO19", "R11.2", "U4.3"]
+    },
+    {
+      "net": "EN",
+      "pins": ["U1.EN", "R6.2", "C12.1", "SW1.1", "J10.10", "J11.5"]
+    },
+    {
+      "net": "IO0",
+      "pins": ["U1.GPIO0", "R7.2", "C13.1", "SW2.1", "J11.6"]
+    },
+    {
+      "net": "MCP_SCK",
+      "pins": ["U1.GPIO12", "J3.6"]
+    },
+    {
+      "net": "MCP_MOSI",
+      "pins": ["U1.GPIO11", "J3.5"]
+    },
+    {
+      "net": "MCP_MISO",
+      "pins": ["U1.GPIO13", "J3.4"]
+    },
+    {
+      "net": "MCP_CS",
+      "pins": ["U1.GPIO10", "J3.3"]
+    },
+    {
+      "net": "MCP_INT",
+      "pins": ["U1.GPIO9", "J3.7"]
+    },
+    {
+      "net": "CANH",
+      "pins": ["J4.1"]
+    },
+    {
+      "net": "CANL",
+      "pins": ["J4.2"]
+    },
+    {
+      "net": "PWM_OUT",
+      "pins": ["U1.GPIO7", "R3.1"]
+    },
+    {
+      "net": "PWM_FILTERED",
+      "pins": ["R3.2", "C10.1", "U3.3"]
+    },
+    {
+      "net": "PWM_ANALOG",
+      "pins": ["U3.1", "R4.1", "J6.1"]
+    },
+    {
+      "net": "OPAMP_FB",
+      "pins": ["R4.2", "R5.1", "U3.2"]
+    },
+    {
+      "net": "COMM_MOSI",
+      "pins": ["U1.GPIO2", "J7.1"]
+    },
+    {
+      "net": "COMM_MISO",
+      "pins": ["U1.GPIO3", "J7.2"]
+    },
+    {
+      "net": "COMM_SCK",
+      "pins": ["U1.GPIO14", "J7.3"]
+    },
+    {
+      "net": "COMM_CS",
+      "pins": ["U1.GPIO21", "R26.2", "J7.4"],
+      "note": "R26 keeps CS HIGH during boot"
+    },
+    {
+      "net": "SD_CS",
+      "pins": ["U1.GPIO15", "R12.2", "J8.CS"]
+    },
+    {
+      "net": "SD_MOSI",
+      "pins": ["U1.GPIO16", "R13.2", "J8.MOSI"]
+    },
+    {
+      "net": "SD_SCK",
+      "pins": ["U1.GPIO17", "R14.2", "J8.SCK"]
+    },
+    {
+      "net": "SD_MISO",
+      "pins": ["U1.GPIO18", "R15.2", "J8.MISO"]
+    },
+    {
+      "net": "SD_CD",
+      "pins": ["U1.GPIO8", "R16.2", "J8.CD"]
+    },
+    {
+      "net": "JTAG_TCK",
+      "pins": ["U1.GPIO39", "J10.4"]
+    },
+    {
+      "net": "JTAG_TDO",
+      "pins": ["U1.GPIO40", "J10.6"]
+    },
+    {
+      "net": "JTAG_TDI",
+      "pins": ["U1.GPIO41", "J10.8"]
+    },
+    {
+      "net": "JTAG_TMS",
+      "pins": ["U1.GPIO42", "J10.2"]
+    },
+    {
+      "net": "UART_TX",
+      "pins": ["U1.TXD0", "J11.3"]
+    },
+    {
+      "net": "UART_RX",
+      "pins": ["U1.RXD0", "J11.4"]
+    },
+    {
+      "net": "RPM_12V_IN",
+      "pins": ["J12.1", "R20.1"]
+    },
+    {
+      "net": "RPM_LED_CATHODE",
+      "pins": ["R20.2", "D3.K", "U5.1"]
+    },
+    {
+      "net": "RPM_IN",
+      "pins": ["U1.GPIO1", "U5.4", "R21.2"]
+    },
+    {
+      "net": "VSS_VR_IN",
+      "pins": ["J13.1", "U6.3", "C15.1", "D4.1"]
+    },
+    {
+      "net": "VSS_IN",
+      "pins": ["U1.GPIO38", "U6.7", "R22.2"]
+    },
+    {
+      "net": "I2C_SDA",
+      "pins": ["U1.GPIO47", "U7.13", "R24.2"]
+    },
+    {
+      "net": "I2C_SCL",
+      "pins": ["U1.GPIO48", "U7.12", "R25.2"]
+    },
+    {
+      "net": "MCP23017_INT",
+      "pins": ["U1.GPIO45", "U7.20"]
+    },
+    {
+      "net": "ENC1_CLK",
+      "pins": ["U7.21", "J14.1"],
+      "note": "GPA0"
+    },
+    {
+      "net": "ENC1_DT",
+      "pins": ["U7.22", "J14.2"],
+      "note": "GPA1"
+    },
+    {
+      "net": "ENC1_SW",
+      "pins": ["U7.23", "J14.3"],
+      "note": "GPA2"
+    },
+    {
+      "net": "ENC2_CLK",
+      "pins": ["U7.24", "J15.1"],
+      "note": "GPA3"
+    },
+    {
+      "net": "ENC2_DT",
+      "pins": ["U7.25", "J15.2"],
+      "note": "GPA4"
+    },
+    {
+      "net": "ENC2_SW",
+      "pins": ["U7.26", "J15.3"],
+      "note": "GPA5"
+    },
+    {
+      "net": "ENC3_CLK",
+      "pins": ["U7.27", "J16.1"],
+      "note": "GPA6"
+    },
+    {
+      "net": "ENC3_DT",
+      "pins": ["U7.28", "J16.2"],
+      "note": "GPA7"
+    },
+    {
+      "net": "ENC3_SW",
+      "pins": ["U7.1", "J16.3"],
+      "note": "GPB0"
+    },
+    {
+      "net": "ENC4_CLK",
+      "pins": ["U7.2", "J17.1"],
+      "note": "GPB1"
+    },
+    {
+      "net": "ENC4_DT",
+      "pins": ["U7.3", "J17.2"],
+      "note": "GPB2"
+    },
+    {
+      "net": "ENC4_SW",
+      "pins": ["U7.4", "J17.3"],
+      "note": "GPB3"
+    },
+    {
+      "net": "ENC5_CLK",
+      "pins": ["U7.5", "J18.1"],
+      "note": "GPB4"
+    },
+    {
+      "net": "ENC5_DT",
+      "pins": ["U7.6", "J18.2"],
+      "note": "GPB5"
+    },
+    {
+      "net": "ENC5_SW",
+      "pins": ["U7.7", "J18.3"],
+      "note": "GPB6"
+    },
+    {
+      "net": "MCP23017_A0",
+      "pins": ["U7.15"],
+      "note": "Tied to GND for address 0x20"
+    },
+    {
+      "net": "MCP23017_A1",
+      "pins": ["U7.16"],
+      "note": "Tied to GND for address 0x20"
+    },
+    {
+      "net": "MCP23017_A2",
+      "pins": ["U7.17"],
+      "note": "Tied to GND for address 0x20"
+    },
+    {
+      "net": "FB_NODE",
+      "pins": ["U2.FB", "R1.2", "R2.1"]
+    },
+    {
+      "net": "SW_NODE",
+      "pins": ["U2.SW", "L1.1"]
+    },
+    {
+      "net": "VOUT_PRE",
+      "pins": ["L1.2", "C2.1"]
+    }
+  ],
+  "designRules": {
+    "clearance": {"value": 0.2, "unit": "mm"},
+    "trackWidth": {"min": 0.25, "default": 0.3, "unit": "mm"},
+    "trackWidthPower": {"value": 0.5, "unit": "mm"},
+    "viaDiameter": {"value": 0.6, "unit": "mm"},
+    "viaDrill": {"value": 0.3, "unit": "mm"},
+    "holeDrill": {"min": 0.3, "unit": "mm"}
+  },
+  "pcb": {
+    "width": {"value": 75, "unit": "mm"},
+    "height": {"value": 55, "unit": "mm"},
+    "layers": 2,
+    "thickness": {"value": 1.6, "unit": "mm"},
+    "copperWeight": {"value": 1, "unit": "oz"},
+    "surfaceFinish": "HASL-LeadFree",
+    "silkscreenColor": "white",
+    "soldermaskColor": "green"
+  },
+  "assembly": {
+    "smtSide": "top",
+    "stencilRequired": true,
+    "jlcpcbAssembly": true
+  },
+  "metadata": {
+    "author": "ESP32 Car Control Project",
+    "license": "MIT",
+    "repository": "https://github.com/user/esp32-car-control",
+    "documentation": "docs/schematics/master-custom-pcb.md"
+  }
+}
