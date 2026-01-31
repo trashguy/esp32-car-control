@@ -10,12 +10,12 @@
 // Layout Constants
 // =============================================================================
 
-#define CONTENT_Y           50
-#define BTN_SIZE            36
-#define BTN_MARGIN          8
+#define CONTENT_Y           45
+#define NAV_BTN_SIZE        40
 #define INPUT_HEIGHT        36
 #define INPUT_WIDTH         200
 #define LIST_ITEM_HEIGHT    32
+#define LIST_HEIGHT         (UI_CONTENT_HEIGHT - CONTENT_Y - 130)  // Adjust for menu bar
 
 // =============================================================================
 // Static State
@@ -47,7 +47,8 @@ static lv_obj_t* list_networks = nullptr;
 // Keyboard (shared for both inputs)
 static lv_obj_t* keyboard = nullptr;
 
-// Back button
+// Menu bar and back button
+static lv_obj_t* menu_bar = nullptr;
 static lv_obj_t* btn_back = nullptr;
 
 // Callbacks
@@ -341,8 +342,9 @@ static void populateNetworkList() {
         
         lv_obj_t* btn = lv_list_add_button(list_networks, NULL, itemText);
         lv_obj_add_event_cb(btn, network_item_event_handler, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-        lv_obj_set_style_bg_color(btn, UI_COLOR_SURFACE, 0);
-        lv_obj_set_style_bg_color(btn, UI_COLOR_PRIMARY, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(btn, UI_COLOR_SURFACE_CONT, 0);
+        lv_obj_set_style_bg_color(btn, UI_COLOR_SURFACE_HIGH, LV_STATE_PRESSED);
+        lv_obj_set_style_radius(btn, 8, 0);
         
         // Style the label inside the button
         lv_obj_t* lbl = lv_obj_get_child(btn, 0);
@@ -360,31 +362,18 @@ void ui_screen_wifi_create() {
     // Create the screen
     screen_wifi = ui_create_screen();
     
-    // Back button (arrow only, in header) - larger touch target
-    btn_back = lv_button_create(screen_wifi);
-    lv_obj_set_size(btn_back, 40, 32);
-    lv_obj_set_pos(btn_back, 5, 4);
-    lv_obj_add_style(btn_back, &style_btn, 0);
-    lv_obj_add_style(btn_back, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_add_event_cb(btn_back, back_btn_event_handler, LV_EVENT_CLICKED, nullptr);
-    
-    lv_obj_t* lbl_back = lv_label_create(btn_back);
-    lv_label_set_text(lbl_back, LV_SYMBOL_LEFT);
-    lv_obj_set_style_text_font(lbl_back, UI_FONT_NORMAL, 0);
-    lv_obj_center(lbl_back);
-    
-    // Title (centered, accounting for back button)
+    // Title (centered)
     lbl_title = lv_label_create(screen_wifi);
     lv_label_set_text(lbl_title, "WIFI SETTINGS");
     lv_obj_set_style_text_font(lbl_title, UI_FONT_NORMAL, 0);
-    lv_obj_set_style_text_color(lbl_title, lv_color_white(), 0);
+    lv_obj_set_style_text_color(lbl_title, UI_COLOR_ON_SURFACE, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 10);
     
     // Horizontal line under title (more space above)
     lv_obj_t* line_title = lv_obj_create(screen_wifi);
     lv_obj_set_size(line_title, 280, 2);
     lv_obj_set_pos(line_title, 20, 40);
-    lv_obj_set_style_bg_color(line_title, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(line_title, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(line_title, 0, 0);
     lv_obj_set_style_radius(line_title, 0, 0);
     
@@ -415,7 +404,7 @@ void ui_screen_wifi_create() {
     lbl_ssid_label = lv_label_create(cont_ssid);
     lv_label_set_text(lbl_ssid_label, "SSID:");
     lv_obj_set_style_text_font(lbl_ssid_label, UI_FONT_SMALL, 0);
-    lv_obj_set_style_text_color(lbl_ssid_label, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_text_color(lbl_ssid_label, UI_COLOR_ON_SURFACE_VAR, 0);
     lv_obj_set_width(lbl_ssid_label, 45);
     
     ta_ssid = lv_textarea_create(cont_ssid);
@@ -424,9 +413,9 @@ void ui_screen_wifi_create() {
     lv_textarea_set_placeholder_text(ta_ssid, "Enter SSID");
     lv_obj_set_width(ta_ssid, 190);
     lv_obj_set_style_text_font(ta_ssid, UI_FONT_SMALL, 0);
-    lv_obj_set_style_bg_color(ta_ssid, UI_COLOR_SURFACE, 0);
-    lv_obj_set_style_border_color(ta_ssid, UI_COLOR_SECONDARY, 0);
-    lv_obj_set_style_border_color(ta_ssid, UI_COLOR_SUCCESS, LV_STATE_FOCUSED);
+    lv_obj_set_style_bg_color(ta_ssid, UI_COLOR_SURFACE_CONT, 0);
+    lv_obj_set_style_border_color(ta_ssid, UI_COLOR_OUTLINE, 0);
+    lv_obj_set_style_border_color(ta_ssid, UI_COLOR_PRIMARY, LV_STATE_FOCUSED);
     lv_obj_add_event_cb(ta_ssid, ta_event_handler, LV_EVENT_ALL, nullptr);
     
     // Scan button (in SSID row)
@@ -455,7 +444,7 @@ void ui_screen_wifi_create() {
     lbl_pass_label = lv_label_create(cont_pass);
     lv_label_set_text(lbl_pass_label, "Pass:");
     lv_obj_set_style_text_font(lbl_pass_label, UI_FONT_SMALL, 0);
-    lv_obj_set_style_text_color(lbl_pass_label, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_text_color(lbl_pass_label, UI_COLOR_ON_SURFACE_VAR, 0);
     lv_obj_set_width(lbl_pass_label, 45);
     
     ta_pass = lv_textarea_create(cont_pass);
@@ -465,19 +454,38 @@ void ui_screen_wifi_create() {
     lv_textarea_set_password_mode(ta_pass, true);
     lv_obj_set_width(ta_pass, 250);
     lv_obj_set_style_text_font(ta_pass, UI_FONT_SMALL, 0);
-    lv_obj_set_style_bg_color(ta_pass, UI_COLOR_SURFACE, 0);
-    lv_obj_set_style_border_color(ta_pass, UI_COLOR_SECONDARY, 0);
-    lv_obj_set_style_border_color(ta_pass, UI_COLOR_SUCCESS, LV_STATE_FOCUSED);
+    lv_obj_set_style_bg_color(ta_pass, UI_COLOR_SURFACE_CONT, 0);
+    lv_obj_set_style_border_color(ta_pass, UI_COLOR_OUTLINE, 0);
+    lv_obj_set_style_border_color(ta_pass, UI_COLOR_PRIMARY, LV_STATE_FOCUSED);
     lv_obj_add_event_cb(ta_pass, ta_event_handler, LV_EVENT_ALL, nullptr);
     
-    // Network list
+    // Network list - use radius 0 to avoid memory issues
     list_networks = lv_list_create(screen_wifi);
-    lv_obj_set_size(list_networks, 310, 90);
+    lv_obj_set_size(list_networks, 310, LIST_HEIGHT);
     lv_obj_set_pos(list_networks, 5, CONTENT_Y + 125);
-    lv_obj_set_style_bg_color(list_networks, lv_color_black(), 0);
-    lv_obj_set_style_border_color(list_networks, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(list_networks, UI_COLOR_SURFACE_DIM, 0);
+    lv_obj_set_style_border_color(list_networks, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(list_networks, 1, 0);
     lv_obj_set_style_pad_all(list_networks, 2, 0);
+    lv_obj_set_style_radius(list_networks, 0, 0);
+    
+    // =========================================================================
+    // Android-style bottom navigation bar (black)
+    // =========================================================================
+    menu_bar = ui_create_menu_bar(screen_wifi, UI_MENU_BAR_HEIGHT);
+    
+    // Back button (far left)
+    btn_back = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_back, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_back, &style_btn_nav, 0);
+    lv_obj_add_style(btn_back, &style_btn_nav_pressed, LV_STATE_PRESSED);
+    lv_obj_add_event_cb(btn_back, back_btn_event_handler, LV_EVENT_CLICKED, nullptr);
+    
+    lv_obj_t* lbl_back = lv_label_create(btn_back);
+    lv_label_set_text(lbl_back, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_font(lbl_back, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_back, lv_color_white(), 0);
+    lv_obj_center(lbl_back);
     
     // Keyboard (hidden by default) - using reusable keyboard module
     keyboard = ui_keyboard_create(screen_wifi);

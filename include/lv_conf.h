@@ -25,7 +25,9 @@
  *====================*/
 
 /* Size of the memory available for `lv_malloc()` in bytes (>= 2kB) */
-#define LV_MEM_SIZE (48 * 1024U)
+/* Note: ESP32-S3 has 512KB SRAM, but much is used by WiFi/BT stack */
+/* Increased from 48KB to 64KB to handle file browser list rendering */
+#define LV_MEM_SIZE (64 * 1024U)
 
 /* Use stdlib malloc/free - better for ESP32 with PSRAM */
 #define LV_MEM_CUSTOM 0
@@ -248,7 +250,7 @@
    IMAGE DECODERS
  *====================*/
 
-/* PNG decoder - useful for icons */
+/* PNG decoder */
 #define LV_USE_PNG 0
 
 /* BMP decoder */

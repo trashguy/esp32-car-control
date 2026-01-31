@@ -12,9 +12,8 @@
 // =============================================================================
 
 #define CONTENT_Y           45
-#define CONTENT_H           150
-#define BTN_SIZE            36
-#define BTN_MARGIN          8
+#define CONTENT_H           (UI_CONTENT_HEIGHT - CONTENT_Y - 5)  // Adjust for menu bar
+#define NAV_BTN_SIZE        40
 
 // =============================================================================
 // Static UI Objects
@@ -41,6 +40,7 @@ static lv_obj_t* lbl_wifi_ip = nullptr;
 static lv_obj_t* lbl_wifi_rssi = nullptr;
 
 // Buttons
+static lv_obj_t* menu_bar = nullptr;
 static lv_obj_t* btn_back = nullptr;
 static lv_obj_t* btn_sd = nullptr;
 static lv_obj_t* btn_wifi = nullptr;
@@ -104,14 +104,14 @@ static lv_obj_t* create_info_row(lv_obj_t* parent, const char* label) {
     lv_obj_t* lbl_key = lv_label_create(cont);
     lv_label_set_text(lbl_key, label);
     lv_obj_set_style_text_font(lbl_key, UI_FONT_SMALL, 0);
-    lv_obj_set_style_text_color(lbl_key, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_text_color(lbl_key, UI_COLOR_ON_SURFACE_VAR, 0);  // MD3 secondary text
     lv_obj_set_width(lbl_key, 100);
     
     // Value part (returned for updating)
     lv_obj_t* lbl_val = lv_label_create(cont);
     lv_label_set_text(lbl_val, "-");
     lv_obj_set_style_text_font(lbl_val, UI_FONT_SMALL, 0);
-    lv_obj_set_style_text_color(lbl_val, lv_color_white(), 0);
+    lv_obj_set_style_text_color(lbl_val, UI_COLOR_ON_SURFACE, 0);  // MD3 primary text
     lv_obj_set_flex_grow(lbl_val, 1);
     
     return lbl_val;
@@ -124,7 +124,7 @@ static lv_obj_t* create_info_row(lv_obj_t* parent, const char* label) {
 static void create_separator(lv_obj_t* parent) {
     lv_obj_t* line = lv_obj_create(parent);
     lv_obj_set_size(line, lv_pct(90), 1);
-    lv_obj_set_style_bg_color(line, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(line, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_bg_opa(line, LV_OPA_50, 0);
     lv_obj_set_style_border_width(line, 0, 0);
     lv_obj_set_style_pad_all(line, 0, 0);
@@ -142,14 +142,14 @@ void ui_screen_settings_create() {
     lbl_title = lv_label_create(screen_settings);
     lv_label_set_text(lbl_title, "SETTINGS");
     lv_obj_set_style_text_font(lbl_title, UI_FONT_NORMAL, 0);
-    lv_obj_set_style_text_color(lbl_title, lv_color_white(), 0);
+    lv_obj_set_style_text_color(lbl_title, UI_COLOR_ON_SURFACE, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 10);
     
     // Horizontal line under title
     lv_obj_t* line_title = lv_obj_create(screen_settings);
     lv_obj_set_size(line_title, 280, 2);
     lv_obj_set_pos(line_title, 20, 35);
-    lv_obj_set_style_bg_color(line_title, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(line_title, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(line_title, 0, 0);
     lv_obj_set_style_radius(line_title, 0, 0);
     
@@ -188,59 +188,71 @@ void ui_screen_settings_create() {
     lbl_wifi_ip = create_info_row(cont_diag, "IP:");
     lbl_wifi_rssi = create_info_row(cont_diag, "Signal:");
     
-    // Back button (bottom center)
-    btn_back = lv_button_create(screen_settings);
-    lv_obj_set_size(btn_back, 80, BTN_SIZE);
-    lv_obj_align(btn_back, LV_ALIGN_BOTTOM_MID, 0, -BTN_MARGIN);
-    lv_obj_add_style(btn_back, &style_btn, 0);
-    lv_obj_add_style(btn_back, &style_btn_pressed, LV_STATE_PRESSED);
+    // =========================================================================
+    // Android-style bottom navigation bar (black)
+    // =========================================================================
+    menu_bar = ui_create_menu_bar(screen_settings, UI_MENU_BAR_HEIGHT);
+    
+    // Back button (far left)
+    btn_back = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_back, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_back, &style_btn_nav, 0);
+    lv_obj_add_style(btn_back, &style_btn_nav_pressed, LV_STATE_PRESSED);
     lv_obj_add_event_cb(btn_back, back_btn_event_handler, LV_EVENT_CLICKED, nullptr);
     
     lv_obj_t* lbl_back = lv_label_create(btn_back);
-    lv_label_set_text(lbl_back, "BACK");
-    lv_obj_set_style_text_font(lbl_back, UI_FONT_SMALL, 0);
+    lv_label_set_text(lbl_back, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_font(lbl_back, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_back, lv_color_white(), 0);
     lv_obj_center(lbl_back);
     
-    // WiFi button (bottom left)
-    btn_wifi = lv_button_create(screen_settings);
-    lv_obj_set_size(btn_wifi, BTN_SIZE, BTN_SIZE);
-    lv_obj_set_pos(btn_wifi, BTN_MARGIN, 240 - BTN_SIZE - BTN_MARGIN);
-    lv_obj_add_style(btn_wifi, &style_btn, 0);
-    lv_obj_add_style(btn_wifi, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_add_event_cb(btn_wifi, wifi_btn_event_handler, LV_EVENT_CLICKED, nullptr);
+    // Spacer to push remaining buttons to the right
+    lv_obj_t* spacer = lv_obj_create(menu_bar);
+    lv_obj_set_size(spacer, 1, 1);
+    lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(spacer, 0, 0);
+    lv_obj_set_flex_grow(spacer, 1);
     
-    lv_obj_t* lbl_wifi = lv_label_create(btn_wifi);
-    lv_label_set_text(lbl_wifi, LV_SYMBOL_WIFI);
-    lv_obj_set_style_text_font(lbl_wifi, UI_FONT_NORMAL, 0);
-    lv_obj_center(lbl_wifi);
-    
-    // SD button (bottom right)
-    btn_sd = lv_button_create(screen_settings);
-    lv_obj_set_size(btn_sd, BTN_SIZE, BTN_SIZE);
-    lv_obj_set_pos(btn_sd, 320 - BTN_SIZE - BTN_MARGIN, 240 - BTN_SIZE - BTN_MARGIN);
-    lv_obj_add_style(btn_sd, &style_btn, 0);
-    lv_obj_add_style(btn_sd, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_add_event_cb(btn_sd, sd_btn_event_handler, LV_EVENT_CLICKED, nullptr);
-    
-    lv_obj_t* lbl_sd = lv_label_create(btn_sd);
-    lv_label_set_text(lbl_sd, LV_SYMBOL_SD_CARD);
-    lv_obj_set_style_text_font(lbl_sd, UI_FONT_NORMAL, 0);
-    lv_obj_center(lbl_sd);
-    
-    // USB button (next to SD button) - production build only
+    // USB button - production build only (before WiFi)
 #if PRODUCTION_BUILD
-    btn_usb = lv_button_create(screen_settings);
-    lv_obj_set_size(btn_usb, BTN_SIZE, BTN_SIZE);
-    lv_obj_set_pos(btn_usb, 320 - BTN_SIZE * 2 - BTN_MARGIN * 2, 240 - BTN_SIZE - BTN_MARGIN);
-    lv_obj_add_style(btn_usb, &style_btn, 0);
-    lv_obj_add_style(btn_usb, &style_btn_pressed, LV_STATE_PRESSED);
+    btn_usb = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_usb, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_usb, &style_btn_nav, 0);
+    lv_obj_add_style(btn_usb, &style_btn_nav_pressed, LV_STATE_PRESSED);
     lv_obj_add_event_cb(btn_usb, usb_btn_event_handler, LV_EVENT_CLICKED, nullptr);
     
     lv_obj_t* lbl_usb = lv_label_create(btn_usb);
     lv_label_set_text(lbl_usb, LV_SYMBOL_USB);
-    lv_obj_set_style_text_font(lbl_usb, UI_FONT_NORMAL, 0);
+    lv_obj_set_style_text_font(lbl_usb, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_usb, lv_color_white(), 0);
     lv_obj_center(lbl_usb);
 #endif
+    
+    // WiFi button (right side)
+    btn_wifi = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_wifi, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_wifi, &style_btn_nav, 0);
+    lv_obj_add_style(btn_wifi, &style_btn_nav_pressed, LV_STATE_PRESSED);
+    lv_obj_add_event_cb(btn_wifi, wifi_btn_event_handler, LV_EVENT_CLICKED, nullptr);
+    
+    lv_obj_t* lbl_wifi = lv_label_create(btn_wifi);
+    lv_label_set_text(lbl_wifi, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_font(lbl_wifi, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_wifi, lv_color_white(), 0);
+    lv_obj_center(lbl_wifi);
+    
+    // SD button (far right)
+    btn_sd = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_sd, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_sd, &style_btn_nav, 0);
+    lv_obj_add_style(btn_sd, &style_btn_nav_pressed, LV_STATE_PRESSED);
+    lv_obj_add_event_cb(btn_sd, sd_btn_event_handler, LV_EVENT_CLICKED, nullptr);
+    
+    lv_obj_t* lbl_sd = lv_label_create(btn_sd);
+    lv_label_set_text(lbl_sd, LV_SYMBOL_SD_CARD);
+    lv_obj_set_style_text_font(lbl_sd, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_sd, lv_color_white(), 0);
+    lv_obj_center(lbl_sd);
 
     // Initial update
     ui_screen_settings_update();

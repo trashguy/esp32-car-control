@@ -29,3 +29,5 @@ __pycache__/
 dist/
 tools/ota-pusher/build/
 tools/ota-pusher/.cache/
+
+background.png

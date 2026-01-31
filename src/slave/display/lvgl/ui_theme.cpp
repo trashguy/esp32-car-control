@@ -13,6 +13,8 @@ lv_style_t style_btn;
 lv_style_t style_btn_pressed;
 lv_style_t style_btn_success;
 lv_style_t style_btn_danger;
+lv_style_t style_btn_nav;
+lv_style_t style_btn_nav_pressed;
 
 // Label styles
 lv_style_t style_label;
@@ -25,6 +27,7 @@ lv_style_t style_label_warning;
 // Container styles
 lv_style_t style_container;
 lv_style_t style_list_item;
+lv_style_t style_menu_bar;
 
 // Progress bar styles
 lv_style_t style_bar_bg;
@@ -45,29 +48,31 @@ static lv_color_t color_btn_pressed;
 static lv_color_t color_btn_text;
 
 static void init_colors() {
-    // Pure black background
-    color_background = lv_color_black();
+    // Material Design 3 Dark Theme colors
     
-    // Pure white text
-    color_text = lv_color_white();
+    // Surface (dark background)
+    color_background = UI_COLOR_SURFACE_DIM;
     
-    // Muted green (#2D9D4A) - from 0x2DC9
-    color_connected = lv_color_make(0x2D, 0x9D, 0x4A);
+    // On Surface (primary text)
+    color_text = UI_COLOR_ON_SURFACE;
     
-    // Muted red (#DC3545) - from 0xD8A3
-    color_disconnected = lv_color_make(0xDC, 0x35, 0x45);
+    // Success - MD3 green (softer)
+    color_connected = UI_COLOR_SUCCESS;
     
-    // Muted amber (#FFC107) - from 0xFD20
-    color_warning = lv_color_make(0xFF, 0xC1, 0x07);
+    // Error - MD3 error color
+    color_disconnected = UI_COLOR_ERROR;
     
-    // Dark blue (#293A4A) - from 0x2945
-    color_btn_normal = lv_color_make(0x29, 0x3A, 0x4A);
+    // Warning - amber
+    color_warning = UI_COLOR_WARNING;
     
-    // Lighter blue (#3D5A73) - from 0x3B8F
-    color_btn_pressed = lv_color_make(0x3D, 0x5A, 0x73);
+    // Primary Container for buttons
+    color_btn_normal = UI_COLOR_PRIMARY_CONT;
     
-    // Soft white (#DEE2E6) - from 0xDEFB
-    color_btn_text = lv_color_make(0xDE, 0xE2, 0xE6);
+    // Surface Container High for pressed state
+    color_btn_pressed = UI_COLOR_SURFACE_HIGH;
+    
+    // Primary color for button text
+    color_btn_text = UI_COLOR_PRIMARY;
 }
 
 // =============================================================================
@@ -85,16 +90,14 @@ void ui_theme_init() {
     lv_style_set_bg_opa(&style_screen, LV_OPA_COVER);
     
     // -------------------------------------------------------------------------
-    // Default button style
+    // Default button style (MD3 Filled Tonal Button)
     // -------------------------------------------------------------------------
     lv_style_init(&style_btn);
     lv_style_set_bg_color(&style_btn, color_btn_normal);
     lv_style_set_bg_opa(&style_btn, LV_OPA_COVER);
-    lv_style_set_border_color(&style_btn, color_btn_text);
-    lv_style_set_border_width(&style_btn, 1);
-    lv_style_set_border_opa(&style_btn, LV_OPA_50);
-    lv_style_set_radius(&style_btn, 8);
-    lv_style_set_pad_all(&style_btn, 8);
+    lv_style_set_border_width(&style_btn, 0);  // MD3 tonal buttons have no border
+    lv_style_set_radius(&style_btn, 20);  // MD3 uses pill-shaped buttons
+    lv_style_set_pad_all(&style_btn, 10);
     lv_style_set_text_color(&style_btn, color_btn_text);
     lv_style_set_text_font(&style_btn, UI_FONT_NORMAL);
     
@@ -109,6 +112,22 @@ void ui_theme_init() {
     // Danger button (red)
     lv_style_init(&style_btn_danger);
     lv_style_set_bg_color(&style_btn_danger, color_disconnected);
+    
+    // -------------------------------------------------------------------------
+    // Navigation bar button style (Android dark theme - transparent with white icons)
+    // -------------------------------------------------------------------------
+    lv_style_init(&style_btn_nav);
+    lv_style_set_bg_opa(&style_btn_nav, LV_OPA_TRANSP);  // Transparent background
+    lv_style_set_border_width(&style_btn_nav, 0);
+    lv_style_set_radius(&style_btn_nav, 8);
+    lv_style_set_pad_all(&style_btn_nav, 8);
+    lv_style_set_text_color(&style_btn_nav, lv_color_white());  // White icons/text
+    lv_style_set_text_font(&style_btn_nav, UI_FONT_NORMAL);
+    
+    // Nav button pressed state (subtle white highlight)
+    lv_style_init(&style_btn_nav_pressed);
+    lv_style_set_bg_color(&style_btn_nav_pressed, lv_color_make(0x40, 0x40, 0x40));
+    lv_style_set_bg_opa(&style_btn_nav_pressed, LV_OPA_COVER);
     
     // -------------------------------------------------------------------------
     // Label styles
@@ -138,36 +157,44 @@ void ui_theme_init() {
     lv_style_set_text_font(&style_label_warning, UI_FONT_NORMAL);
     
     // -------------------------------------------------------------------------
-    // Container style
+    // Container style (MD3 Surface Container)
     // -------------------------------------------------------------------------
     lv_style_init(&style_container);
-    lv_style_set_bg_color(&style_container, lv_color_make(0x10, 0x10, 0x10));
+    lv_style_set_bg_color(&style_container, UI_COLOR_SURFACE_CONT);
     lv_style_set_bg_opa(&style_container, LV_OPA_COVER);
-    lv_style_set_border_color(&style_container, lv_color_make(0x30, 0x30, 0x30));
+    lv_style_set_border_color(&style_container, UI_COLOR_OUTLINE_VAR);
     lv_style_set_border_width(&style_container, 1);
-    lv_style_set_radius(&style_container, 4);
-    lv_style_set_pad_all(&style_container, 8);
+    lv_style_set_radius(&style_container, 12);  // MD3 uses larger radius
+    lv_style_set_pad_all(&style_container, 12);
     
     // List item style
     lv_style_init(&style_list_item);
     lv_style_set_bg_opa(&style_list_item, LV_OPA_TRANSP);
     lv_style_set_pad_ver(&style_list_item, 8);
-    lv_style_set_border_color(&style_list_item, lv_color_make(0x30, 0x30, 0x30));
+    lv_style_set_border_color(&style_list_item, UI_COLOR_OUTLINE_VAR);
     lv_style_set_border_width(&style_list_item, 1);
     lv_style_set_border_side(&style_list_item, LV_BORDER_SIDE_BOTTOM);
     
+    // Menu bar style (black bar at bottom of screen)
+    lv_style_init(&style_menu_bar);
+    lv_style_set_bg_color(&style_menu_bar, UI_COLOR_MENU_BAR);
+    lv_style_set_bg_opa(&style_menu_bar, LV_OPA_COVER);
+    lv_style_set_border_width(&style_menu_bar, 0);
+    lv_style_set_radius(&style_menu_bar, 0);
+    lv_style_set_pad_all(&style_menu_bar, 4);
+    
     // -------------------------------------------------------------------------
-    // Progress bar styles
+    // Progress bar styles (MD3 style)
     // -------------------------------------------------------------------------
     lv_style_init(&style_bar_bg);
-    lv_style_set_bg_color(&style_bar_bg, lv_color_make(0x20, 0x20, 0x20));
+    lv_style_set_bg_color(&style_bar_bg, UI_COLOR_SURFACE_CONT);
     lv_style_set_bg_opa(&style_bar_bg, LV_OPA_COVER);
-    lv_style_set_radius(&style_bar_bg, 4);
+    lv_style_set_radius(&style_bar_bg, 8);
     
     lv_style_init(&style_bar_indicator);
-    lv_style_set_bg_color(&style_bar_indicator, color_connected);
+    lv_style_set_bg_color(&style_bar_indicator, UI_COLOR_PRIMARY);
     lv_style_set_bg_opa(&style_bar_indicator, LV_OPA_COVER);
-    lv_style_set_radius(&style_bar_indicator, 4);
+    lv_style_set_radius(&style_bar_indicator, 8);
     
     Serial.println("UI theme initialized");
 }
@@ -223,6 +250,27 @@ lv_obj_t* ui_create_screen() {
     lv_obj_t* scr = lv_obj_create(NULL);
     lv_obj_add_style(scr, &style_screen, 0);
     return scr;
+}
+
+lv_obj_t* ui_create_menu_bar(lv_obj_t* parent, int32_t height) {
+    // Android-style bottom navigation bar
+    // - Black background
+    // - Full width, fixed height at bottom
+    // - Uses flex layout for evenly spaced items
+    
+    lv_obj_t* bar = lv_obj_create(parent);
+    lv_obj_set_size(bar, 320, height);  // Full width
+    lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_style(bar, &style_menu_bar, 0);
+    
+    // Use flex layout for even spacing of nav items
+    lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // Disable scrolling on menu bar
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+    
+    return bar;
 }
 
 // =============================================================================

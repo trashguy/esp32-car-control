@@ -10,11 +10,10 @@
 // =============================================================================
 
 #define FILE_LIST_Y         45
-#define FILE_LIST_H         150
+#define FILE_LIST_H         (UI_CONTENT_HEIGHT - FILE_LIST_Y - 5)  // Adjust for menu bar
 #define FILE_LINE_HEIGHT    22
 #define MAX_FILES           64
-#define BTN_SIZE            36
-#define BTN_MARGIN          8
+#define NAV_BTN_SIZE        40
 
 // =============================================================================
 // Static UI Objects
@@ -31,7 +30,8 @@ static lv_obj_t* list_files = nullptr;
 // USB locked overlay
 static lv_obj_t* cont_usb_locked = nullptr;
 
-// Buttons
+// Menu bar and buttons
+static lv_obj_t* menu_bar = nullptr;
 static lv_obj_t* btn_back = nullptr;
 
 // Callbacks
@@ -74,7 +74,9 @@ static void swipe_back_handler() {
 // =============================================================================
 
 static void populate_file_list() {
-    if (!list_files) return;
+    if (!list_files) {
+        return;
+    }
     
     // Clear existing items
     lv_obj_clean(list_files);
@@ -91,12 +93,22 @@ static void populate_file_list() {
     
     // Open root directory
     fs::File root = SD_MMC.open("/");
-    if (!root || !root.isDirectory()) {
+    if (!root) {
+        lv_obj_t* lbl = lv_label_create(list_files);
+        lv_label_set_text(lbl, "Cannot open SD");
+        lv_obj_set_style_text_font(lbl, UI_FONT_NORMAL, 0);
+        lv_obj_set_style_text_color(lbl, UI_COLOR_ERROR, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+        return;
+    }
+    
+    if (!root.isDirectory()) {
         lv_obj_t* lbl = lv_label_create(list_files);
         lv_label_set_text(lbl, "Cannot read SD");
         lv_obj_set_style_text_font(lbl, UI_FONT_NORMAL, 0);
         lv_obj_set_style_text_color(lbl, UI_COLOR_ERROR, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+        root.close();
         return;
     }
     
@@ -111,6 +123,11 @@ static void populate_file_list() {
         lv_obj_t* btn = lv_list_add_button(list_files, 
             isDir ? LV_SYMBOL_DIRECTORY : LV_SYMBOL_FILE, 
             name);
+        
+        if (!btn) {
+            file.close();
+            break;
+        }
         
         // Style the button
         lv_obj_set_style_bg_color(btn, UI_COLOR_SURFACE, 0);
@@ -132,7 +149,13 @@ static void populate_file_list() {
         lv_obj_add_event_cb(btn, file_item_event_handler, LV_EVENT_CLICKED, nullptr);
         
         fileCount++;
+        file.close();  // Close current file before getting next
         file = root.openNextFile();
+        
+        // Yield to prevent watchdog timeout on large directories
+        if (fileCount % 10 == 0) {
+            vTaskDelay(1);
+        }
     }
     
     root.close();
@@ -204,41 +227,48 @@ void ui_screen_filebrowser_create() {
     lbl_title = lv_label_create(screen_filebrowser);
     lv_label_set_text(lbl_title, "FILE BROWSER");
     lv_obj_set_style_text_font(lbl_title, UI_FONT_NORMAL, 0);
-    lv_obj_set_style_text_color(lbl_title, lv_color_white(), 0);
+    lv_obj_set_style_text_color(lbl_title, UI_COLOR_ON_SURFACE, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 10);
     
     // Horizontal line under title
     lv_obj_t* line_title = lv_obj_create(screen_filebrowser);
     lv_obj_set_size(line_title, 280, 2);
     lv_obj_set_pos(line_title, 20, 35);
-    lv_obj_set_style_bg_color(line_title, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(line_title, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(line_title, 0, 0);
     lv_obj_set_style_radius(line_title, 0, 0);
     
     // File list (LVGL list widget)
+    // Note: Using radius 0 to avoid layer buffer allocation issues (memory constrained)
     list_files = lv_list_create(screen_filebrowser);
     lv_obj_set_size(list_files, 304, FILE_LIST_H);
     lv_obj_set_pos(list_files, 8, FILE_LIST_Y);
-    lv_obj_set_style_bg_color(list_files, UI_COLOR_BACKGROUND, 0);
-    lv_obj_set_style_border_color(list_files, UI_COLOR_SECONDARY, 0);
+    lv_obj_set_style_bg_color(list_files, UI_COLOR_SURFACE_DIM, 0);
+    lv_obj_set_style_border_color(list_files, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(list_files, 1, 0);
     lv_obj_set_style_pad_all(list_files, 4, 0);
     lv_obj_set_style_pad_row(list_files, 2, 0);
+    lv_obj_set_style_radius(list_files, 0, 0);
     
     // Create USB locked overlay (hidden initially)
     create_usb_locked_overlay();
     
-    // Back button (bottom left)
-    btn_back = lv_button_create(screen_filebrowser);
-    lv_obj_set_size(btn_back, BTN_SIZE, BTN_SIZE);
-    lv_obj_set_pos(btn_back, BTN_MARGIN, 240 - BTN_SIZE - BTN_MARGIN);
-    lv_obj_add_style(btn_back, &style_btn, 0);
-    lv_obj_add_style(btn_back, &style_btn_pressed, LV_STATE_PRESSED);
+    // =========================================================================
+    // Android-style bottom navigation bar (black)
+    // =========================================================================
+    menu_bar = ui_create_menu_bar(screen_filebrowser, UI_MENU_BAR_HEIGHT);
+    
+    // Back button (far left)
+    btn_back = lv_button_create(menu_bar);
+    lv_obj_set_size(btn_back, NAV_BTN_SIZE, NAV_BTN_SIZE);
+    lv_obj_add_style(btn_back, &style_btn_nav, 0);
+    lv_obj_add_style(btn_back, &style_btn_nav_pressed, LV_STATE_PRESSED);
     lv_obj_add_event_cb(btn_back, back_btn_event_handler, LV_EVENT_CLICKED, nullptr);
     
     lv_obj_t* lbl_back = lv_label_create(btn_back);
     lv_label_set_text(lbl_back, LV_SYMBOL_LEFT);
-    lv_obj_set_style_text_font(lbl_back, UI_FONT_NORMAL, 0);
+    lv_obj_set_style_text_font(lbl_back, UI_FONT_MEDIUM, 0);
+    lv_obj_set_style_text_color(lbl_back, lv_color_white(), 0);
     lv_obj_center(lbl_back);
     
     // Add swipe gesture (swipe right to go back)
@@ -252,7 +282,16 @@ lv_obj_t* ui_screen_filebrowser_get() {
 }
 
 void ui_screen_filebrowser_refresh() {
-    if (usb_locked) return;  // Don't refresh while USB mounted
+    // Check current USB mount state first
+    bool currentlyMounted = usbMscMounted();
+    if (currentlyMounted != usb_locked) {
+        ui_screen_filebrowser_set_usb_locked(currentlyMounted);
+    }
+    
+    if (usb_locked) {
+        return;  // Don't refresh while USB mounted
+    }
+    
     populate_file_list();
 }
 
@@ -265,9 +304,6 @@ void ui_screen_filebrowser_update() {
         if (!currentlyMounted) {
             // USB was ejected - refresh file list
             populate_file_list();
-            Serial.println("USB ejected - file browser unlocked");
-        } else {
-            Serial.println("USB mounted - file browser locked");
         }
     }
 }
