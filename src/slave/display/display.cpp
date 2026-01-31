@@ -266,6 +266,11 @@ bool displayInit() {
     // Load main screen
     lv_screen_load(ui_screen_main_get());
     
+    // Set initial WiFi status
+    lastWifiConnected = isWifiConnected();
+    ui_screen_main_set_wifi_status(lastWifiConnected);
+    Serial.printf("Initial WiFi status: %s\n", lastWifiConnected ? "connected" : "disconnected");
+    
     Serial.println("LVGL UI initialized with all screens");
 #else
     // Initialize WiFi settings from NVS and apply (legacy)
@@ -346,10 +351,23 @@ void displayLoop() {
         ui_screen_main_update_blink();
     }
     
+    // Update menu bar auto-hide timer (main screen only)
+    if (currentScreen == SCREEN_MAIN) {
+        ui_screen_main_update_menu_bar();
+    }
+    
     // Periodic updates for current screen
     static unsigned long lastPeriodicUpdate = 0;
     if (millis() - lastPeriodicUpdate > 1000) {
         lastPeriodicUpdate = millis();
+        
+        // Update WiFi status icon on main screen
+        bool currentWifiConnected = isWifiConnected();
+        if (currentWifiConnected != lastWifiConnected) {
+            lastWifiConnected = currentWifiConnected;
+            ui_screen_main_set_wifi_status(currentWifiConnected);
+            Serial.printf("WiFi status changed: %s\n", currentWifiConnected ? "connected" : "disconnected");
+        }
         
         switch (currentScreen) {
             case SCREEN_SETTINGS:

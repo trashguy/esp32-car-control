@@ -1,6 +1,7 @@
 #include "ui_screen_wifi.h"
 #include "ui_theme.h"
 #include "ui_keyboard.h"
+#include "../display_common.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Preferences.h>
@@ -10,21 +11,19 @@
 // Layout Constants
 // =============================================================================
 
-#define CONTENT_Y           45
+#define CONTENT_Y           10    // Start near top (no header)
 #define NAV_BTN_SIZE        40
 #define INPUT_HEIGHT        36
 #define INPUT_WIDTH         200
 #define LIST_ITEM_HEIGHT    32
-#define LIST_HEIGHT         (UI_CONTENT_HEIGHT - CONTENT_Y - 130)  // Adjust for menu bar
+#define CONTENT_HEIGHT      (UI_SCREEN_HEIGHT - UI_MENU_BAR_HEIGHT)  // Full height minus menu bar
 
 // =============================================================================
 // Static State
 // =============================================================================
 
 static lv_obj_t* screen_wifi = nullptr;
-
-// Title
-static lv_obj_t* lbl_title = nullptr;
+static lv_obj_t* cont_scroll = nullptr;  // Scrollable content container
 
 // Mode toggle
 static lv_obj_t* btn_mode = nullptr;
@@ -86,6 +85,22 @@ static void populateNetworkList();
 // Event Handlers
 // =============================================================================
 
+// Screen/container click handler - hide keyboard when clicking outside text areas
+static void screen_click_handler(lv_event_t* e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        lv_obj_t* target = (lv_obj_t*)lv_event_get_target(e);
+        // Only hide if clicking on screen, scroll container, or other non-input elements
+        if (target != ta_ssid && target != ta_pass && keyboard) {
+            ui_keyboard_hide(keyboard);
+            // Defocus any text area
+            lv_obj_t* focused = lv_group_get_focused(lv_group_get_default());
+            if (focused && (focused == ta_ssid || focused == ta_pass)) {
+                lv_obj_clear_state(focused, LV_STATE_FOCUSED);
+            }
+        }
+    }
+}
+
 // Wrapper for swipe-back that also hides keyboard
 static void swipe_back_handler() {
     // Hide keyboard if visible before navigating back
@@ -109,6 +124,7 @@ static void mode_btn_event_handler(lv_event_t* e) {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         // Toggle mode
         wifiMode = (wifiMode == 0) ? 1 : 0;
+        setWifiMode(wifiMode);  // Update global state for isWifiConnected()
         updateModeButton();
         updateInputsVisibility();
         saveSettings();
@@ -260,11 +276,13 @@ static void updateModeButton() {
     if (!btn_mode || !lbl_mode) return;
     
     if (wifiMode == 0) {
-        lv_label_set_text(lbl_mode, "Mode: Disabled");
-        lv_obj_set_style_bg_color(btn_mode, UI_COLOR_SURFACE, 0);
+        lv_label_set_text(lbl_mode, "WiFi: OFF");
+        lv_obj_set_style_bg_color(btn_mode, lv_color_make(0x48, 0x48, 0x48), 0);  // Grey (disabled)
+        lv_obj_set_style_text_color(lbl_mode, UI_COLOR_ON_SURFACE, 0);
     } else {
-        lv_label_set_text(lbl_mode, "Mode: Client");
-        lv_obj_set_style_bg_color(btn_mode, UI_COLOR_SUCCESS, 0);
+        lv_label_set_text(lbl_mode, "WiFi: ON");
+        lv_obj_set_style_bg_color(btn_mode, UI_COLOR_PRIMARY_CONT, 0);  // Blue container
+        lv_obj_set_style_text_color(lbl_mode, UI_COLOR_PRIMARY, 0);  // Blue text
     }
 }
 
@@ -362,44 +380,47 @@ void ui_screen_wifi_create() {
     // Create the screen
     screen_wifi = ui_create_screen();
     
-    // Title (centered)
-    lbl_title = lv_label_create(screen_wifi);
-    lv_label_set_text(lbl_title, "WIFI SETTINGS");
-    lv_obj_set_style_text_font(lbl_title, UI_FONT_NORMAL, 0);
-    lv_obj_set_style_text_color(lbl_title, UI_COLOR_ON_SURFACE, 0);
-    lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 10);
+    // Create scrollable content container (above menu bar)
+    cont_scroll = lv_obj_create(screen_wifi);
+    lv_obj_set_size(cont_scroll, UI_SCREEN_WIDTH, CONTENT_HEIGHT);
+    lv_obj_set_pos(cont_scroll, 0, 0);
+    lv_obj_set_style_bg_opa(cont_scroll, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont_scroll, 0, 0);
+    lv_obj_set_style_pad_all(cont_scroll, 5, 0);
+    lv_obj_set_style_pad_row(cont_scroll, 8, 0);
+    lv_obj_set_flex_flow(cont_scroll, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont_scroll, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_scroll_dir(cont_scroll, LV_DIR_VER);
+    lv_obj_add_flag(cont_scroll, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(cont_scroll, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(cont_scroll, screen_click_handler, LV_EVENT_CLICKED, nullptr);
     
-    // Horizontal line under title (more space above)
-    lv_obj_t* line_title = lv_obj_create(screen_wifi);
-    lv_obj_set_size(line_title, 280, 2);
-    lv_obj_set_pos(line_title, 20, 40);
-    lv_obj_set_style_bg_color(line_title, UI_COLOR_OUTLINE_VAR, 0);
-    lv_obj_set_style_border_width(line_title, 0, 0);
-    lv_obj_set_style_radius(line_title, 0, 0);
-    
-    // Mode toggle button
-    btn_mode = lv_button_create(screen_wifi);
+    // Mode toggle button - pill/oval style matching main screen (centered by flex)
+    btn_mode = lv_button_create(cont_scroll);
     lv_obj_set_size(btn_mode, 200, 36);
-    lv_obj_set_pos(btn_mode, 60, CONTENT_Y);
-    lv_obj_add_style(btn_mode, &style_btn, 0);
-    lv_obj_add_style(btn_mode, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(btn_mode, lv_color_make(0x48, 0x48, 0x48), 0);  // Grey
+    lv_obj_set_style_bg_color(btn_mode, lv_color_make(0x58, 0x58, 0x58), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn_mode, 18, 0);  // Pill shape
+    lv_obj_set_style_border_width(btn_mode, 0, 0);
+    lv_obj_set_style_shadow_width(btn_mode, 0, 0);
     lv_obj_add_event_cb(btn_mode, mode_btn_event_handler, LV_EVENT_CLICKED, nullptr);
     
     lbl_mode = lv_label_create(btn_mode);
-    lv_label_set_text(lbl_mode, "Mode: Disabled");
+    lv_label_set_text(lbl_mode, "WiFi: OFF");
     lv_obj_set_style_text_font(lbl_mode, UI_FONT_NORMAL, 0);
+    lv_obj_set_style_text_color(lbl_mode, UI_COLOR_ON_SURFACE, 0);
     lv_obj_center(lbl_mode);
     
     // SSID row: label + input + scan button
-    cont_ssid = lv_obj_create(screen_wifi);
+    cont_ssid = lv_obj_create(cont_scroll);
     lv_obj_set_size(cont_ssid, 310, 40);
-    lv_obj_set_pos(cont_ssid, 5, CONTENT_Y + 42);
     lv_obj_set_style_bg_opa(cont_ssid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(cont_ssid, 0, 0);
     lv_obj_set_style_pad_all(cont_ssid, 0, 0);
     lv_obj_set_flex_flow(cont_ssid, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(cont_ssid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(cont_ssid, 5, 0);
+    lv_obj_clear_flag(cont_ssid, LV_OBJ_FLAG_SCROLLABLE);
     
     lbl_ssid_label = lv_label_create(cont_ssid);
     lv_label_set_text(lbl_ssid_label, "SSID:");
@@ -418,28 +439,32 @@ void ui_screen_wifi_create() {
     lv_obj_set_style_border_color(ta_ssid, UI_COLOR_PRIMARY, LV_STATE_FOCUSED);
     lv_obj_add_event_cb(ta_ssid, ta_event_handler, LV_EVENT_ALL, nullptr);
     
-    // Scan button (in SSID row)
+    // Scan button (in SSID row) - matching grey style
     btn_scan = lv_button_create(cont_ssid);
     lv_obj_set_size(btn_scan, 55, 32);
-    lv_obj_add_style(btn_scan, &style_btn, 0);
-    lv_obj_add_style(btn_scan, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(btn_scan, lv_color_make(0x48, 0x48, 0x48), 0);  // Grey
+    lv_obj_set_style_bg_color(btn_scan, lv_color_make(0x58, 0x58, 0x58), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn_scan, 16, 0);  // Pill shape
+    lv_obj_set_style_border_width(btn_scan, 0, 0);
+    lv_obj_set_style_shadow_width(btn_scan, 0, 0);
     lv_obj_add_event_cb(btn_scan, scan_btn_event_handler, LV_EVENT_CLICKED, nullptr);
     
     lv_obj_t* lbl_scan = lv_label_create(btn_scan);
     lv_label_set_text(lbl_scan, "SCAN");
     lv_obj_set_style_text_font(lbl_scan, UI_FONT_SMALL, 0);
+    lv_obj_set_style_text_color(lbl_scan, UI_COLOR_ON_SURFACE, 0);
     lv_obj_center(lbl_scan);
     
     // Password input container
-    cont_pass = lv_obj_create(screen_wifi);
+    cont_pass = lv_obj_create(cont_scroll);
     lv_obj_set_size(cont_pass, 310, 40);
-    lv_obj_set_pos(cont_pass, 5, CONTENT_Y + 82);
     lv_obj_set_style_bg_opa(cont_pass, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(cont_pass, 0, 0);
     lv_obj_set_style_pad_all(cont_pass, 0, 0);
     lv_obj_set_flex_flow(cont_pass, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(cont_pass, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(cont_pass, 5, 0);
+    lv_obj_clear_flag(cont_pass, LV_OBJ_FLAG_SCROLLABLE);
     
     lbl_pass_label = lv_label_create(cont_pass);
     lv_label_set_text(lbl_pass_label, "Pass:");
@@ -459,10 +484,11 @@ void ui_screen_wifi_create() {
     lv_obj_set_style_border_color(ta_pass, UI_COLOR_PRIMARY, LV_STATE_FOCUSED);
     lv_obj_add_event_cb(ta_pass, ta_event_handler, LV_EVENT_ALL, nullptr);
     
-    // Network list - use radius 0 to avoid memory issues
-    list_networks = lv_list_create(screen_wifi);
-    lv_obj_set_size(list_networks, 310, LIST_HEIGHT);
-    lv_obj_set_pos(list_networks, 5, CONTENT_Y + 125);
+    // Network list - use radius 0 to avoid memory issues, grows with content
+    list_networks = lv_list_create(cont_scroll);
+    lv_obj_set_size(list_networks, 310, LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(list_networks, 60, 0);
+    lv_obj_set_style_max_height(list_networks, 120, 0);
     lv_obj_set_style_bg_color(list_networks, UI_COLOR_SURFACE_DIM, 0);
     lv_obj_set_style_border_color(list_networks, UI_COLOR_OUTLINE_VAR, 0);
     lv_obj_set_style_border_width(list_networks, 1, 0);
@@ -510,6 +536,7 @@ void ui_screen_wifi_init() {
     // Load settings from NVS
     prefs.begin("wifi", true);
     wifiMode = prefs.getInt("mode", 0);
+    setWifiMode(wifiMode);  // Update global state for isWifiConnected()
     String ssid = prefs.getString("ssid", "");
     String pass = prefs.getString("pass", "");
     strncpy(ssidBuffer, ssid.c_str(), UI_MAX_SSID_LEN);

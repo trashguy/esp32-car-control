@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-01-31
+
+Android-style dark theme redesign with new dashboard widgets.
+
+### Added
+- **Power Steering Widget** - Oval pill-shaped container showing mode (AUTO/MANUAL) and RPM value
+- **Water Pump Widget** - Oval container showing mode and percentage value
+- **WiFi Status Icon** - Green WiFi indicator in top-right when connected
+- **Menu Bar Auto-Hide** - Bottom menu bar hides after 3 seconds, tap screen to reveal
+- **Background Generator** - Python tool (`tools/generate_background.py`) for creating gradient backgrounds
+- **VONDERWAGEN Branding** - Brand identity at top of main screen
+
+### Changed
+- **Dark Theme** - Grey background (#303030) with black 48px bottom menu bar
+- **Navigation UX** - Moved all back/action buttons to bottom menu bar
+- **Button Styling** - Transparent nav buttons with white icons and subtle press highlight
+- **Mode Display** - Changed from "A"/"M" letters to full "AUTO"/"MANUAL" text
+- **WiFi Settings** - Redesigned with scrollable container and pill-style toggle buttons
+- **LVGL Memory** - Increased heap allocation from 48KB to 64KB for stability
+
+### Fixed
+- **File Browser** - Fixed memory issues with list item radius
+- **WiFi Screen** - Fixed memory issues with list item radius
+- **Keyboard Dismiss** - Tapping outside text fields now hides keyboard
+
 ## [1.1.0] - 2026-01-31
 
 LVGL UI system with legacy TFT fallback and display code reorganization.

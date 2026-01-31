@@ -70,4 +70,16 @@ void ui_screen_main_set_rpm_down_callback(void (*callback)(void));
  */
 void ui_screen_main_update_blink();
 
+/**
+ * Update menu bar auto-hide timer.
+ * Call this from the main UI update loop.
+ */
+void ui_screen_main_update_menu_bar();
+
+/**
+ * Update WiFi status icon visibility.
+ * @param connected True to show WiFi icon, false to hide
+ */
+void ui_screen_main_set_wifi_status(bool connected);
+
 #endif // UI_SCREEN_MAIN_H
