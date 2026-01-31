@@ -82,4 +82,18 @@ void ui_screen_main_update_menu_bar();
  */
 void ui_screen_main_set_wifi_status(bool connected);
 
+/**
+ * Update water temperature display.
+ * @param tempF10 Temperature in Fahrenheit * 10 (e.g., 1850 = 185.0°F)
+ * @param status WATER_TEMP_STATUS_* value from protocol.h
+ */
+void ui_screen_main_set_water_temp(int16_t tempF10, uint8_t status);
+
+/**
+ * Update water temperature overheat warning blink.
+ * Call this periodically (e.g., every 100ms) from the main UI update loop.
+ * When temp >= 235°F, this will flash the screen background red.
+ */
+void ui_screen_main_update_water_temp_warning();
+
 #endif // UI_SCREEN_MAIN_H

@@ -23,6 +23,14 @@ uint16_t spiSlaveGetLastRpm();
 // Get the last received mode from master (authoritative)
 uint8_t spiSlaveGetMasterMode();
 
+// Get water temperature from master (Fahrenheit * 10)
+// Returns WATER_TEMP_INVALID if not received or sensor error
+int16_t spiSlaveGetWaterTempF10();
+
+// Get water temperature status from master
+// Returns WATER_TEMP_STATUS_* value from protocol.h
+uint8_t spiSlaveGetWaterTempStatus();
+
 // Get time since last valid packet (ms)
 unsigned long spiSlaveGetTimeSinceLastPacket();
 

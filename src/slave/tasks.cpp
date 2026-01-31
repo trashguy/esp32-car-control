@@ -2,6 +2,7 @@
 #include "slave/spi_slave.h"
 #include "slave/ota_handler.h"
 #include "display/display.h"
+#include "display/lvgl/ui_screen_main.h"
 #include "usb_msc.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
@@ -160,15 +161,21 @@ static void taskSpiComm(void* parameter) {
         displayMsg.mode = spiSlaveGetMasterMode();
         displayMsg.connected = connected;
         displayMsg.forceRefresh = reconnected;
+        displayMsg.waterTempF10 = spiSlaveGetWaterTempF10();
+        displayMsg.waterTempStatus = spiSlaveGetWaterTempStatus();
 
         // Always send on state changes, otherwise throttle
         static uint16_t lastSentRpm = 0;
         static uint8_t lastSentMode = 0;
         static bool lastSentConnected = false;
+        static int16_t lastSentWaterTempF10 = 0;
+        static uint8_t lastSentWaterTempStatus = 0xFF;
 
         bool stateChanged = (displayMsg.rpm != lastSentRpm) ||
                            (displayMsg.mode != lastSentMode) ||
                            (displayMsg.connected != lastSentConnected) ||
+                           (displayMsg.waterTempF10 != lastSentWaterTempF10) ||
+                           (displayMsg.waterTempStatus != lastSentWaterTempStatus) ||
                            reconnected;
 
         if (stateChanged) {
@@ -177,6 +184,8 @@ static void taskSpiComm(void* parameter) {
                 lastSentRpm = displayMsg.rpm;
                 lastSentMode = displayMsg.mode;
                 lastSentConnected = displayMsg.connected;
+                lastSentWaterTempF10 = displayMsg.waterTempF10;
+                lastSentWaterTempStatus = displayMsg.waterTempStatus;
             }
         }
 
@@ -209,11 +218,16 @@ static void taskDisplay(void* parameter) {
                 displayUpdateRpm(spiMsg.rpm);
             }
             displaySetConnected(spiMsg.connected);
+            // Update water temperature display
+            ui_screen_main_set_water_temp(spiMsg.waterTempF10, spiMsg.waterTempStatus);
         }
 
         // Process display loop (touch, animations, etc.)
         // TFT mutex is taken/released inside displayLoop
         displayLoop();
+
+        // Update water temperature warning blink animation
+        ui_screen_main_update_water_temp_warning();
 
         // Process OTA events (non-blocking)
         otaHandlerLoop();

@@ -25,6 +25,15 @@
 #define WP_WIDGET_HEIGHT    44
 #define WP_WIDGET_WIDTH    220
 
+// Water temperature widget layout - below water pump
+#define WT_WIDGET_Y         (WP_WIDGET_Y + WP_WIDGET_HEIGHT + 24)  // Below WP label
+#define WT_WIDGET_HEIGHT    44
+#define WT_WIDGET_WIDTH    220
+
+// Water temp warning threshold (235°F = overheat warning)
+#define WT_WARNING_TEMP_F   235
+#define WT_BLINK_INTERVAL_MS 500
+
 // =============================================================================
 // Static UI Objects
 // =============================================================================
@@ -57,6 +66,12 @@ static lv_obj_t* lbl_wp_mode = nullptr;
 static lv_obj_t* lbl_wp_value = nullptr;
 static lv_obj_t* lbl_wp_label = nullptr;
 
+// Water temperature widget
+static lv_obj_t* cont_water_temp = nullptr;
+static lv_obj_t* cont_wt_row = nullptr;
+static lv_obj_t* lbl_wt_value = nullptr;
+static lv_obj_t* lbl_wt_label = nullptr;
+
 // Menu bar
 static lv_obj_t* menu_bar = nullptr;
 static lv_obj_t* btn_gear = nullptr;
@@ -71,6 +86,12 @@ static void (*cb_rpm_down)(void) = nullptr;
 static bool blink_state = false;
 static bool is_connected = false;
 static uint8_t current_mode = MODE_AUTO;
+
+// Water temp warning state
+static bool wt_warning_active = false;
+static bool wt_blink_state = false;
+static uint32_t wt_last_blink_time = 0;
+static int16_t current_water_temp_f10 = 0;
 
 // Menu bar auto-hide state
 static bool menu_bar_visible = false;
@@ -318,6 +339,48 @@ void ui_screen_main_create() {
     lv_obj_set_style_text_color(lbl_wp_label, UI_COLOR_ON_SURFACE_VAR, 0);
     lv_obj_align_to(lbl_wp_label, cont_water_pump, LV_ALIGN_OUT_BOTTOM_MID, 0, 4);
     
+    // =========================================================================
+    // Water Temperature Widget: Oval container showing temperature in °F
+    // =========================================================================
+    
+    // Outer oval container (lighter grey background)
+    cont_water_temp = lv_obj_create(screen_main);
+    lv_obj_set_size(cont_water_temp, WT_WIDGET_WIDTH, WT_WIDGET_HEIGHT);
+    lv_obj_align(cont_water_temp, LV_ALIGN_TOP_MID, 0, WT_WIDGET_Y);
+    lv_obj_set_style_bg_color(cont_water_temp, lv_color_make(0x48, 0x48, 0x48), 0);  // Lighter grey
+    lv_obj_set_style_bg_opa(cont_water_temp, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(cont_water_temp, 0, 0);
+    lv_obj_set_style_radius(cont_water_temp, WT_WIDGET_HEIGHT / 2, 0);  // Full oval/pill shape
+    lv_obj_set_style_pad_all(cont_water_temp, 0, 0);
+    lv_obj_clear_flag(cont_water_temp, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // Inner flex container for value (centered in oval)
+    cont_wt_row = lv_obj_create(cont_water_temp);
+    lv_obj_set_size(cont_wt_row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_center(cont_wt_row);
+    lv_obj_set_style_bg_opa(cont_wt_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont_wt_row, 0, 0);
+    lv_obj_set_style_pad_all(cont_wt_row, 0, 0);
+    lv_obj_clear_flag(cont_wt_row, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // Use flex layout for horizontal alignment
+    lv_obj_set_flex_flow(cont_wt_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cont_wt_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(cont_wt_row, 8, 0);
+    
+    // Temperature value label
+    lbl_wt_value = lv_label_create(cont_wt_row);
+    lv_label_set_text(lbl_wt_value, "---");
+    lv_obj_set_style_text_font(lbl_wt_value, UI_FONT_LARGE, 0);
+    lv_obj_set_style_text_color(lbl_wt_value, UI_COLOR_ON_SURFACE, 0);
+    
+    // "WATER TEMP" label below the oval
+    lbl_wt_label = lv_label_create(screen_main);
+    lv_label_set_text(lbl_wt_label, "WATER TEMP");
+    lv_obj_set_style_text_font(lbl_wt_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(lbl_wt_label, UI_COLOR_ON_SURFACE_VAR, 0);
+    lv_obj_align_to(lbl_wt_label, cont_water_temp, LV_ALIGN_OUT_BOTTOM_MID, 0, 4);
+    
     // "NO SIGNAL" label (shown when disconnected, hides both widgets)
     lbl_no_signal = lv_label_create(screen_main);
     lv_label_set_text(lbl_no_signal, "NO SIGNAL");
@@ -370,6 +433,9 @@ void ui_screen_main_set_rpm(uint16_t rpm, bool connected) {
         // Show water pump widget
         lv_obj_clear_flag(cont_water_pump, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(lbl_wp_label, LV_OBJ_FLAG_HIDDEN);
+        // Show water temp widget
+        lv_obj_clear_flag(cont_water_temp, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(lbl_wt_label, LV_OBJ_FLAG_HIDDEN);
         // Hide no signal
         lv_obj_add_flag(lbl_no_signal, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -379,8 +445,14 @@ void ui_screen_main_set_rpm(uint16_t rpm, bool connected) {
         // Hide water pump widget
         lv_obj_add_flag(cont_water_pump, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(lbl_wp_label, LV_OBJ_FLAG_HIDDEN);
+        // Hide water temp widget
+        lv_obj_add_flag(cont_water_temp, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(lbl_wt_label, LV_OBJ_FLAG_HIDDEN);
         // Show no signal
         lv_obj_clear_flag(lbl_no_signal, LV_OBJ_FLAG_HIDDEN);
+        // Reset warning state when disconnected
+        wt_warning_active = false;
+        lv_obj_set_style_bg_color(screen_main, UI_COLOR_BACKGROUND, 0);
     }
 }
 
@@ -465,5 +537,80 @@ void ui_screen_main_set_wifi_status(bool connected) {
         lv_obj_clear_flag(lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void ui_screen_main_set_water_temp(int16_t tempF10, uint8_t status) {
+    if (lbl_wt_value == nullptr || cont_water_temp == nullptr) return;
+    
+    current_water_temp_f10 = tempF10;
+    
+    // Check if we have valid temperature data
+    if (status != WATER_TEMP_STATUS_OK || tempF10 == WATER_TEMP_INVALID) {
+        // Show error state based on status
+        if (status == WATER_TEMP_STATUS_DISCONNECTED) {
+            lv_label_set_text(lbl_wt_value, "DISC");
+        } else if (status == WATER_TEMP_STATUS_SHORTED) {
+            lv_label_set_text(lbl_wt_value, "SHORT");
+        } else if (status == WATER_TEMP_STATUS_DISABLED) {
+            lv_label_set_text(lbl_wt_value, "OFF");
+        } else {
+            lv_label_set_text(lbl_wt_value, "---");
+        }
+        lv_obj_set_style_text_color(lbl_wt_value, UI_COLOR_ON_SURFACE_VAR, 0);
+        wt_warning_active = false;
+        lv_obj_set_style_bg_color(screen_main, UI_COLOR_BACKGROUND, 0);
+        return;
+    }
+    
+    // Convert from F*10 to whole degrees for display
+    int16_t tempF = tempF10 / 10;
+    
+    // Format temperature string with degree symbol
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d°F", tempF);
+    lv_label_set_text(lbl_wt_value, buf);
+    
+    // Check for overheat warning (>= 235°F)
+    if (tempF >= WT_WARNING_TEMP_F) {
+        wt_warning_active = true;
+        // Set text color to red/error
+        lv_obj_set_style_text_color(lbl_wt_value, UI_COLOR_ERROR, 0);
+        // Also make the pill background red
+        lv_obj_set_style_bg_color(cont_water_temp, UI_COLOR_ERROR_CONT, 0);
+    } else {
+        wt_warning_active = false;
+        // Normal text color
+        lv_obj_set_style_text_color(lbl_wt_value, UI_COLOR_ON_SURFACE, 0);
+        // Reset pill background to normal
+        lv_obj_set_style_bg_color(cont_water_temp, lv_color_make(0x48, 0x48, 0x48), 0);
+        // Reset screen background if warning was active
+        lv_obj_set_style_bg_color(screen_main, UI_COLOR_BACKGROUND, 0);
+    }
+}
+
+void ui_screen_main_update_water_temp_warning() {
+    if (!wt_warning_active || !is_connected) {
+        // No warning or not connected - ensure background is normal
+        if (wt_blink_state) {
+            wt_blink_state = false;
+            lv_obj_set_style_bg_color(screen_main, UI_COLOR_BACKGROUND, 0);
+        }
+        return;
+    }
+    
+    // Check if it's time to toggle blink
+    uint32_t now = lv_tick_get();
+    if (now - wt_last_blink_time >= WT_BLINK_INTERVAL_MS) {
+        wt_last_blink_time = now;
+        wt_blink_state = !wt_blink_state;
+        
+        if (wt_blink_state) {
+            // Flash red hue on screen background
+            lv_obj_set_style_bg_color(screen_main, lv_color_make(0x50, 0x20, 0x20), 0);
+        } else {
+            // Return to normal background
+            lv_obj_set_style_bg_color(screen_main, UI_COLOR_BACKGROUND, 0);
+        }
     }
 }

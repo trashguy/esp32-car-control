@@ -7,10 +7,14 @@
 // Initialize SPI master for communication with slave device
 bool spiMasterInit();
 
-// Send RPM and mode to slave, receive requested mode/RPM back (full-duplex)
+// Send RPM, mode, and water temp to slave, receive requested mode/RPM back (full-duplex)
 // Master is authoritative - sends state, receives UI input requests
+// waterTempF10: Water temperature in Fahrenheit * 10 (e.g., 1850 = 185.0°F)
+// waterStatus: WATER_TEMP_STATUS_* value from protocol.h
 // Returns true if valid response received from slave
-bool spiExchange(uint16_t rpmToSend, uint8_t modeToSend, uint8_t* requestedMode, uint16_t* requestedRpm);
+bool spiExchange(uint16_t rpmToSend, uint8_t modeToSend, 
+                 int16_t waterTempF10, uint8_t waterStatus,
+                 uint8_t* requestedMode, uint16_t* requestedRpm);
 
 // =============================================================================
 // OTA SPI Functions

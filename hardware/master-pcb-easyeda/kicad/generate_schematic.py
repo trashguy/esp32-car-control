@@ -19,13 +19,14 @@ COMPONENTS = {
     "D2": {"name": "SMBJ15A", "pins": 2, "lcsc": "C123769"},
     "D3": {"name": "1N4148W", "pins": 2, "lcsc": "C81598"},
     "D4": {"name": "P6KE33CA", "pins": 2, "lcsc": "C108380"},
+    "D5": {"name": "BZT52C3V3", "pins": 2, "lcsc": "C173386"},
     "L1": {"name": "10uH", "pins": 2, "lcsc": "C167134"},
     "SW1": {"name": "Reset", "pins": 2, "lcsc": "C318884"},
     "SW2": {"name": "Boot", "pins": 2, "lcsc": "C318884"},
 }
 
-# Add capacitors C1-C16
-for i in range(1, 17):
+# Add capacitors C1-C18
+for i in range(1, 19):
     if i in [1, 2]:
         COMPONENTS[f"C{i}"] = {"name": "22uF", "pins": 2, "lcsc": "C45783"}
     elif i in [7, 8, 11, 19]:
@@ -37,12 +38,12 @@ for i in range(1, 17):
     else:
         COMPONENTS[f"C{i}"] = {"name": "100nF", "pins": 2, "lcsc": "C1525"}
 
-# Add resistors R1-R26
+# Add resistors R1-R29 (R17-R19 skipped, R27-R29 for water temp)
 resistor_values = {
     1: "33K", 2: "10K", 3: "10K", 4: "5.1K", 5: "10K", 6: "10K", 7: "10K",
     8: "5.1K", 9: "5.1K", 10: "22R", 11: "22R", 12: "10K", 13: "10K", 14: "10K",
     15: "47K", 16: "47K", 20: "2.2K", 21: "10K", 22: "10K", 23: "200K", 24: "10K",
-    25: "10K", 26: "10K"
+    25: "10K", 26: "10K", 27: "1K", 28: "10K", 29: "1K"
 }
 for i, val in resistor_values.items():
     COMPONENTS[f"R{i}"] = {"name": val, "pins": 2, "lcsc": "C25744"}
@@ -62,6 +63,8 @@ COMPONENTS["J12"] = {"name": "JST-PH 2P", "pins": 2, "lcsc": "C131338"}
 COMPONENTS["J13"] = {"name": "JST-PH 2P", "pins": 2, "lcsc": "C131338"}
 for i in range(14, 19):
     COMPONENTS[f"J{i}"] = {"name": "JST-XH 5P", "pins": 5, "lcsc": "C157991"}
+# J19 - Water Temperature sensor input
+COMPONENTS["J19"] = {"name": "JST-PH 2P", "pins": 2, "lcsc": "C131338"}
 
 def get_symbol_name(ref, comp):
     """Generate a unique symbol name based on component"""
@@ -149,6 +152,7 @@ SIGNAL_NETS = [
     "ENC3_CLK", "ENC3_DT", "ENC3_SW",
     "ENC4_CLK", "ENC4_DT", "ENC4_SW",
     "ENC5_CLK", "ENC5_DT", "ENC5_SW",
+    "WATER_TEMP_PULLUP", "WATER_TEMP_SENSE", "WATER_TEMP_FILTERED", "WATER_TEMP_IN",
 ]
 
 def main():

@@ -695,6 +695,76 @@
       "group": "Encoder Mux"
     },
     {
+      "ref": "J19",
+      "name": "JST-PH 2P",
+      "footprint": "PH-2A",
+      "quantity": 1,
+      "manufacturerPart": "B2B-PH-K-S",
+      "lcsc": "C131338",
+      "description": "JST PH 2-pin Water Temp Sensor",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "R27",
+      "name": "1K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1001TCE",
+      "lcsc": "C11702",
+      "description": "1K 1% NTC Pull-up",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "R28",
+      "name": "10K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1002TCE",
+      "lcsc": "C25744",
+      "description": "10K 1% ESD Current Limit",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "R29",
+      "name": "1K",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "0402WGF1001TCE",
+      "lcsc": "C11702",
+      "description": "1K 1% RC Filter",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "C17",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF Pull-up Filter",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "C18",
+      "name": "100nF",
+      "footprint": "0402",
+      "quantity": 1,
+      "manufacturerPart": "CL05B104KO5NNNC",
+      "lcsc": "C1525",
+      "description": "100nF RC Filter",
+      "group": "Water Temp"
+    },
+    {
+      "ref": "D5",
+      "name": "BZT52C3V3",
+      "footprint": "SOD-123",
+      "quantity": 1,
+      "manufacturerPart": "BZT52C3V3",
+      "lcsc": "C173386",
+      "description": "3.3V Zener ESD Protection",
+      "group": "Water Temp"
+    },
+    {
       "ref": "SW1",
       "name": "Reset",
       "footprint": "SW-SMD-6x6",
@@ -775,7 +845,12 @@
     {"name": "ENC4_SW", "class": "signal"},
     {"name": "ENC5_CLK", "class": "signal"},
     {"name": "ENC5_DT", "class": "signal"},
-    {"name": "ENC5_SW", "class": "signal"}
+    {"name": "ENC5_SW", "class": "signal"},
+    {"name": "WATER_TEMP_PULLUP", "class": "signal"},
+    {"name": "WATER_TEMP_SENSE", "class": "signal"},
+    {"name": "WATER_TEMP_PROTECTED", "class": "signal"},
+    {"name": "WATER_TEMP_FILTERED", "class": "signal"},
+    {"name": "WATER_TEMP_IN", "class": "signal"}
   ],
   "connections": [
     {
@@ -784,11 +859,11 @@
         "U1.GND", "U2.GND", "U3.4", "U4.GND", "U5.3", "U6.1", "U6.4", "U7.10",
         "J1.2", "J2.GND", "J3.2", "J4.4", "J6.3", "J7.6", "J8.GND", "J9.GND",
         "J10.3", "J10.5", "J10.9", "J11.1", "J12.2", "J13.2",
-        "J14.5", "J15.5", "J16.5", "J17.5", "J18.5",
+        "J14.5", "J15.5", "J16.5", "J17.5", "J18.5", "J19.2",
         "C1.2", "C2.2", "C3.2", "C4.2", "C5.2", "C6.2", "C7.2", "C8.2", "C9.2",
-        "C10.2", "C11.2", "C12.2", "C13.2", "C14.2", "C15.2", "C16.2",
+        "C10.2", "C11.2", "C12.2", "C13.2", "C14.2", "C15.2", "C16.2", "C17.2", "C18.2",
         "R2.2", "R5.2", "R8.2", "R9.2",
-        "D2.A", "SW1.2", "SW2.2"
+        "D2.A", "D5.2", "SW1.2", "SW2.2"
       ]
     },
     {
@@ -799,7 +874,7 @@
         "J14.4", "J15.4", "J16.4", "J17.4", "J18.4",
         "C3.1", "C4.1", "C5.1", "C6.1", "C7.1", "C8.1", "C9.1", "C14.1", "C16.1",
         "R1.1", "R6.1", "R7.1", "R12.1", "R13.1", "R14.1", "R15.1", "R16.1",
-        "R21.1", "R22.1", "R24.1", "R25.1", "R26.1",
+        "R21.1", "R22.1", "R24.1", "R25.1", "R26.1", "R27.1",
         "U7.18"
       ]
     },
@@ -1054,6 +1129,31 @@
       "net": "ENC5_SW",
       "pins": ["U7.7", "J18.3"],
       "note": "GPB6"
+    },
+    {
+      "net": "WATER_TEMP_PULLUP",
+      "pins": ["R27.1", "C17.1"],
+      "note": "3.3V pull-up node"
+    },
+    {
+      "net": "WATER_TEMP_SENSE",
+      "pins": ["R27.2", "C17.2", "J19.1", "R28.1"],
+      "note": "Sensor junction"
+    },
+    {
+      "net": "WATER_TEMP_PROTECTED",
+      "pins": ["R28.2", "D5.1"],
+      "note": "After current limit resistor"
+    },
+    {
+      "net": "WATER_TEMP_FILTERED",
+      "pins": ["D5.2", "R29.1"],
+      "note": "After Zener clamp"
+    },
+    {
+      "net": "WATER_TEMP_IN",
+      "pins": ["R29.2", "C18.1", "U1.GPIO4"],
+      "note": "Filtered signal to ADC"
     },
     {
       "net": "MCP23017_A0",

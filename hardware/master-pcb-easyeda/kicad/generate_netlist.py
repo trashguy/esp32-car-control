@@ -7,9 +7,9 @@ from datetime import datetime
 NETLIST_DATA = """
 # POWER NETS
 +12V: J1.1, D1.A, U2.VIN, U3.8, D2.K, J4.3
-+3V3: U2.OUT, U1.3V3, U1.3V3_2, J3.1, J7.5, J8.VDD, J9.3V3, J10.1, J11.2, J14.4, J15.4, J16.4, J17.4, J18.4, C3.1, C4.1, C5.1, C6.1, C7.1, C8.1, C9.1, C14.1, C16.1, R6.1, R7.1, R12.1, R13.1, R14.1, R15.1, R16.1, R21.1, R22.1, R24.1, R25.1, R26.1, U6.8, U7.9, U7.18
++3V3: U2.OUT, U1.3V3, U1.3V3_2, J3.1, J7.5, J8.VDD, J9.3V3, J10.1, J11.2, J14.4, J15.4, J16.4, J17.4, J18.4, C3.1, C4.1, C5.1, C6.1, C7.1, C8.1, C9.1, C14.1, C16.1, R6.1, R7.1, R12.1, R13.1, R14.1, R15.1, R16.1, R21.1, R22.1, R24.1, R25.1, R26.1, U6.8, U7.9, U7.18, R27.1
 +5V: J6.2
-GND: J1.2, D1.K, D2.A, U2.GND, U3.4, U4.2, U5.3, U6.1, U6.4, U7.10, U7.15, U7.16, U7.17, U1.GND, U1.GND_2, U1.GND_3, J2.GND, J3.2, J4.4, J6.3, J7.6, J8.GND, J9.GND, J10.3, J10.5, J10.9, J11.1, J12.2, J13.2, J14.5, J15.5, J16.5, J17.5, J18.5, C1.2, C2.2, C3.2, C4.2, C5.2, C6.2, C7.2, C8.2, C9.2, C10.2, C11.2, C12.2, C13.2, C14.2, C15.2, C16.2, R2.2, R5.2, R8.2, R9.2, D4.2, SW1.2, SW2.2
+GND: J1.2, D1.K, D2.A, U2.GND, U3.4, U4.2, U5.3, U6.1, U6.4, U7.10, U7.15, U7.16, U7.17, U1.GND, U1.GND_2, U1.GND_3, J2.GND, J3.2, J4.4, J6.3, J7.6, J8.GND, J9.GND, J10.3, J10.5, J10.9, J11.1, J12.2, J13.2, J14.5, J15.5, J16.5, J17.5, J18.5, C1.2, C2.2, C3.2, C4.2, C5.2, C6.2, C7.2, C8.2, C9.2, C10.2, C11.2, C12.2, C13.2, C14.2, C15.2, C16.2, R2.2, R5.2, R8.2, R9.2, D4.2, SW1.2, SW2.2, J19.2, C17.2, C18.2
 VBUS: J2.VBUS, C11.1, U4.5
 
 # USB INTERFACE
@@ -110,6 +110,14 @@ ENC5_CLK: U7.5, J18.1
 ENC5_DT: U7.6, J18.2
 ENC5_SW: U7.7, J18.3
 
+# WATER TEMPERATURE INPUT (GM LS1 NTC Sensor on GPIO4)
+# Voltage divider with 1K pull-up, ESD protection, RC filter
+WATER_TEMP_PULLUP: R27.1, C17.1
+WATER_TEMP_SENSE: R27.2, C17.2, J19.1, R28.1
+WATER_TEMP_PROTECTED: R28.2, D5.1
+WATER_TEMP_FILTERED: D5.2, R29.1
+WATER_TEMP_IN: R29.2, C18.1, U1.GPIO4
+
 # INPUT CAPS
 C1_POS: C1.1, U2.VIN
 """
@@ -127,6 +135,7 @@ COMPONENTS = {
     "D2": {"value": "SMBJ15A", "footprint": "SMB"},
     "D3": {"value": "1N4148W", "footprint": "SOD-123"},
     "D4": {"value": "P6KE33CA", "footprint": "SMB"},
+    "D5": {"value": "BZT52C3V3", "footprint": "SOD-123"},
     "L1": {"value": "10uH", "footprint": "IND-SMD_4x4"},
     "SW1": {"value": "Reset", "footprint": "SW-SMD-6x6"},
     "SW2": {"value": "Boot", "footprint": "SW-SMD-6x6"},
@@ -147,11 +156,12 @@ COMPONENTS = {
     "J16": {"value": "JST-XH_5P", "footprint": "JST-XH-5A"},
     "J17": {"value": "JST-XH_5P", "footprint": "JST-XH-5A"},
     "J18": {"value": "JST-XH_5P", "footprint": "JST-XH-5A"},
+    "J19": {"value": "JST-PH_2P", "footprint": "JST-PH-2A"},
 }
 
 # Add capacitors
 cap_values = {1: "22uF", 2: "22uF", 7: "10uF", 8: "10uF", 10: "1uF", 11: "10uF", 15: "1nF"}
-for i in range(1, 17):
+for i in range(1, 19):
     COMPONENTS[f"C{i}"] = {"value": cap_values.get(i, "100nF"), "footprint": "0402" if i not in [1,2,7,8,10,11] else "0805"}
 
 # Add resistors
@@ -159,7 +169,7 @@ resistor_values = {
     1: "33K", 2: "10K", 3: "10K", 4: "5.1K", 5: "10K", 6: "10K", 7: "10K",
     8: "5.1K", 9: "5.1K", 10: "22R", 11: "22R", 12: "10K", 13: "10K", 14: "10K",
     15: "47K", 16: "47K", 20: "2.2K", 21: "10K", 22: "10K", 23: "200K", 24: "10K",
-    25: "10K", 26: "10K"
+    25: "10K", 26: "10K", 27: "1K", 28: "10K", 29: "1K"
 }
 for i, val in resistor_values.items():
     COMPONENTS[f"R{i}"] = {"value": val, "footprint": "0402"}

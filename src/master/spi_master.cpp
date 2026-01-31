@@ -30,14 +30,16 @@ bool spiMasterInit() {
     return true;
 }
 
-bool spiExchange(uint16_t rpmToSend, uint8_t modeToSend, uint8_t* requestedMode, uint16_t* requestedRpm) {
+bool spiExchange(uint16_t rpmToSend, uint8_t modeToSend, 
+                 int16_t waterTempF10, uint8_t waterStatus,
+                 uint8_t* requestedMode, uint16_t* requestedRpm) {
     if (!commSpi) return false;
 
     // Prepare master->slave packet (master is authoritative)
     uint8_t txBuffer[SPI_PACKET_SIZE];
     uint8_t rxBuffer[SPI_PACKET_SIZE];
 
-    packMasterPacket(txBuffer, rpmToSend, modeToSend);
+    packMasterPacket(txBuffer, rpmToSend, modeToSend, waterTempF10, waterStatus);
 
     // Begin SPI transaction
     commSpi->beginTransaction(spiSettings);

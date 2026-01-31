@@ -2,6 +2,48 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-01-31
+
+Water temperature monitoring with display widget and hardware support.
+
+### Added
+- **Water Temperature Sensor Support** - GM LS1-style NTC thermistor coolant temperature sensor:
+  - New `water_temp.cpp/h` module with Steinhart-Hart temperature calculation
+  - ADC-based reading with configurable averaging (default 16 samples)
+  - Sensor health detection: open circuit, short circuit, and disabled states
+  - Serial commands: `w` to enable/show, `W` to disable
+- **Water Temperature Display Widget** - Pill-shaped widget on main screen:
+  - Shows temperature in °F with status indicators (DISC, SHORT, OFF)
+  - Overheat warning at >= 235°F with red pill background
+  - Screen background flashes red during overheat (500ms blink interval)
+  - Positioned below Water Pump widget, hidden when disconnected
+- **SPI Protocol Extension** - Expanded packet from 5 to 8 bytes:
+  - Added water temperature (int16_t, F*10 format for 0.1°F precision)
+  - Added water temperature status byte (OK, DISCONNECTED, SHORTED, DISABLED)
+  - Backward-compatible checksum calculation
+- **Simulated Water Temperature** - For testing without hardware:
+  - Ramps from 122°F to 302°F and back in 5°F steps every 500ms
+  - Active in SIMULATE mode or when sensor disabled
+- **Hardware Circuit Documentation** - `docs/schematics/water-temp-input-circuit.md`:
+  - Full schematic with ESD protection (10K + 3.3V Zener)
+  - RC low-pass filter (1.6kHz cutoff) for ignition noise rejection
+  - Resistance/temperature lookup table for GM LS1 CTS
+  - Bill of materials and wiring notes
+
+### Changed
+- **SPI Packet Structure** - Extended to 8 bytes for water temp data:
+  - Master->Slave: Header + RPM (2B) + Mode + WaterTemp (2B) + Status + Checksum
+  - Slave->Master: Header + RPM (2B) + Mode + Reserved (3B) + Checksum
+- **`spiExchange()` Signature** - Added `waterTempF10` and `waterStatus` parameters
+- **`SpiToDisplayMsg` Struct** - Added `waterTempF10` and `waterTempStatus` fields
+- **Master PCB Schematic** - Updated with water temp input circuit (J18 connector, GPIO 4)
+- **Config Header** - Added `WATER_TEMP_INPUT_PIN` (GPIO 4) and related constants
+
+### Technical
+- Protocol constants: `WATER_TEMP_STATUS_OK/DISCONNECTED/SHORTED/DISABLED`
+- Special value: `WATER_TEMP_INVALID` (0x7FFF) for error conditions
+- Warning threshold: 235°F triggers visual overheat alarm
+
 ## [1.2.0] - 2026-01-31
 
 Android-style dark theme redesign with new dashboard widgets.

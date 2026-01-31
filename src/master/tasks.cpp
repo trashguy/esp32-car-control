@@ -4,6 +4,7 @@
 #include "master/ota_handler.h"
 #include "can_handler.h"
 #include "rpm_counter.h"
+#include "water_temp.h"
 #include "encoder_mux.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
@@ -36,6 +37,17 @@ MasterState masterState = {
 // Simulation constants
 #define SIM_MIN_RPM 3500
 #define SIM_MAX_RPM 4500
+
+// Water temp simulation constants (values in F * 10)
+#define SIM_WATER_TEMP_MIN_F10  1220   // 122.0°F - warm idle
+#define SIM_WATER_TEMP_MAX_F10  3020   // 302.0°F - danger zone
+#define SIM_WATER_TEMP_STEP_F10   50   // 5.0°F per step
+#define SIM_WATER_TEMP_INTERVAL_MS 500 // Step every 500ms
+
+// Simulated water temp state
+static int16_t simWaterTempF10 = SIM_WATER_TEMP_MIN_F10;
+static bool simWaterTempGoingUp = true;
+static uint32_t lastSimWaterTempChange = 0;
 
 // =============================================================================
 // Task Handles
@@ -457,7 +469,50 @@ static void taskSpiComm(void* param) {
         uint8_t reqMode;
         uint16_t reqRpm;
 
-        if (spiExchange(rpmToSend, modeToSend, &reqMode, &reqRpm)) {
+        // Get water temperature data to send to slave
+        // Use simulated data when in SIMULATE mode or sensor disabled
+        int16_t waterTempF10;
+        uint8_t waterStatus;
+        
+        if (masterState.opMode == OP_MODE_SIMULATE || !waterTempIsEnabled()) {
+            // Simulate water temperature ramping from 122°F to 302°F
+            if (now - lastSimWaterTempChange >= SIM_WATER_TEMP_INTERVAL_MS) {
+                lastSimWaterTempChange = now;
+                
+                if (simWaterTempGoingUp) {
+                    simWaterTempF10 += SIM_WATER_TEMP_STEP_F10;
+                    if (simWaterTempF10 >= SIM_WATER_TEMP_MAX_F10) {
+                        simWaterTempF10 = SIM_WATER_TEMP_MAX_F10;
+                        simWaterTempGoingUp = false;
+                    }
+                } else {
+                    simWaterTempF10 -= SIM_WATER_TEMP_STEP_F10;
+                    if (simWaterTempF10 <= SIM_WATER_TEMP_MIN_F10) {
+                        simWaterTempF10 = SIM_WATER_TEMP_MIN_F10;
+                        simWaterTempGoingUp = true;
+                    }
+                }
+            }
+            waterTempF10 = simWaterTempF10;
+            waterStatus = WATER_TEMP_STATUS_OK;
+        } else if (!waterTempIsSensorConnected()) {
+            waterTempF10 = WATER_TEMP_INVALID;
+            waterStatus = WATER_TEMP_STATUS_DISCONNECTED;
+        } else if (waterTempIsSensorShorted()) {
+            waterTempF10 = WATER_TEMP_INVALID;
+            waterStatus = WATER_TEMP_STATUS_SHORTED;
+        } else {
+            float tempF = waterTempGetFahrenheit();
+            if (isnan(tempF)) {
+                waterTempF10 = WATER_TEMP_INVALID;
+                waterStatus = WATER_TEMP_STATUS_DISCONNECTED;
+            } else {
+                waterTempF10 = (int16_t)(tempF * 10.0f);
+                waterStatus = WATER_TEMP_STATUS_OK;
+            }
+        }
+
+        if (spiExchange(rpmToSend, modeToSend, waterTempF10, waterStatus, &reqMode, &reqRpm)) {
             // Valid response
             masterState.lastValidSpiTime = now;
 
@@ -539,6 +594,9 @@ static void printHelp() {
     Serial.println("RPM Pulse Counter:");
     Serial.println("  p - Enable / show RPM reading");
     Serial.println("  P - Disable pulse counter");
+    Serial.println("Water Temp Sensor:");
+    Serial.println("  w - Enable / show temperature");
+    Serial.println("  W - Disable water temp sensor");
     Serial.println("SD Card:");
     Serial.println("  d - List root directory");
     Serial.println("  x - SD card info");
@@ -560,6 +618,23 @@ static void printStats() {
     Serial.printf("Display Mode: %s\n", masterState.displayMode == MODE_AUTO ? "AUTO" : "MANUAL");
     Serial.printf("Manual RPM: %u\n", masterState.manualRpm);
     Serial.printf("Health: %s\n", getHealthName(masterState.health));
+    
+    // Water temp status
+    if (waterTempIsEnabled()) {
+        float tempF = waterTempGetFahrenheit();
+        if (!isnan(tempF)) {
+            Serial.printf("Water Temp: %.1f°F (%.1f°C)\n", tempF, waterTempGetCelsius());
+        } else if (!waterTempIsSensorConnected()) {
+            Serial.println("Water Temp: DISCONNECTED");
+        } else if (waterTempIsSensorShorted()) {
+            Serial.println("Water Temp: SHORTED");
+        } else {
+            Serial.println("Water Temp: ERROR");
+        }
+    } else {
+        Serial.println("Water Temp: disabled");
+    }
+    
     Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
     Serial.printf("Resets: %lu (WDT: %lu)\n", rtcResetCount, rtcWdtResetCount);
     Serial.println();
@@ -643,7 +718,10 @@ static void processSerial() {
             } else {
                 uint8_t reqMode;
                 uint16_t reqRpm;
-                if (spiExchange(1234, masterState.displayMode, &reqMode, &reqRpm)) {
+                // Test SPI with dummy water temp data
+                if (spiExchange(1234, masterState.displayMode, 
+                                WATER_TEMP_INVALID, WATER_TEMP_STATUS_DISABLED,
+                                &reqMode, &reqRpm)) {
                     Serial.printf("Test OK: slave req mode=%s, rpm=%u\n",
                                   reqMode == MODE_AUTO ? "AUTO" : "MANUAL", reqRpm);
                 } else {
@@ -714,6 +792,50 @@ static void processSerial() {
                 Serial.println("RPM counter disabled");
             } else {
                 Serial.println("RPM counter already disabled");
+            }
+            break;
+
+        case 'w':
+            // Enable water temp sensor or show reading
+            if (!waterTempIsEnabled()) {
+                waterTempEnable();
+                Serial.println("Water temp sensor enabled");
+            } else {
+                // Show water temp reading with diagnostics
+                float tempF = waterTempGetFahrenheit();
+                float tempC = waterTempGetCelsius();
+                if (!isnan(tempF)) {
+                    Serial.printf("Water Temp: %.1f°F (%.1f°C)\n", tempF, tempC);
+                    Serial.printf("  ADC: %u, Voltage: %.3fV, Resistance: %.0f ohms\n",
+                                  waterTempGetRawADC(),
+                                  waterTempGetVoltage(),
+                                  waterTempGetResistanceOhms());
+                    Serial.printf("  Reads: %lu, Errors: %lu\n",
+                                  waterTempGetReadCount(),
+                                  waterTempGetErrorCount());
+                } else if (!waterTempIsSensorConnected()) {
+                    Serial.println("Water Temp: SENSOR NOT CONNECTED (open circuit)");
+                    Serial.printf("  ADC: %u, Voltage: %.3fV\n",
+                                  waterTempGetRawADC(),
+                                  waterTempGetVoltage());
+                } else if (waterTempIsSensorShorted()) {
+                    Serial.println("Water Temp: SENSOR SHORTED");
+                    Serial.printf("  ADC: %u, Voltage: %.3fV\n",
+                                  waterTempGetRawADC(),
+                                  waterTempGetVoltage());
+                } else {
+                    Serial.println("Water Temp: READ ERROR");
+                }
+            }
+            break;
+
+        case 'W':
+            // Disable water temp sensor
+            if (waterTempIsEnabled()) {
+                waterTempDisable();
+                Serial.println("Water temp sensor disabled");
+            } else {
+                Serial.println("Water temp sensor already disabled");
             }
             break;
 

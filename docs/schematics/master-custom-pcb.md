@@ -40,52 +40,54 @@ All external peripheral connections use locking cable connectors for reliable au
 | J15 | JST-XH 5-pin | 5 | Encoder 3 - Future Use (via MCP23017) |
 | J16 | JST-XH 5-pin | 5 | Encoder 4 - Future Use (via MCP23017) |
 | J17 | JST-XH 5-pin | 5 | Encoder 5 - Future Use (via MCP23017) |
+| J18 | JST-PH 2-pin | 2 | Water Temp Input (LS1 CTS Sensor) |
 
 ## System Block Diagram
 
 ```
-                    ┌────────────────────────────────────────────────────────────────────────────────┐
-     12V IN         │                           MASTER CUSTOM PCB                                    │
-        │           │                                                                                │
-        ▼           │   ┌─────────┐    ┌─────────────────────────────────────┐                      │
-   ┌─────────┐      │   │  USB-C  │    │     ESP32-S3-WROOM-1-N16R8         │                      │
-   │ MP2359  │──3.3V──►│  (J2)   │◄──►│                                     │                      │
-   │  Buck   │      │   │         │    │  GPIO 19/20: USB D+/D-             │                      │
-   └────┬────┘      │   └─────────┘    │  GPIO 1: RPM Input (PCNT)          │                      │
-        │           │                   │  GPIO 38: VSS Input (PCNT)         │                      │
-        │           │                   │  GPIO 47/48: I2C (MCP23017)        │                      │
-       12V──────────│───────────────────│  SPI1: MCP2515 (CAN)               │                      │
-        │           │   ┌─────────┐    │  SPI2: Slave Communication          │                      │
-        │           │   │ MCP2515 │◄──►│  SPI3: SD Card                      │                      │
-        │           │   │   CAN   │    │  GPIO 7: PWM Output                 │                      │
-        │           │   │ + TJA   │    └──────────────┬──────────────────────┘                      │
-        │           │   │  (J3)   │                   │                                             │
-        │           │   └────┬────┘     ┌─────────────┼─────────────┐                               │
-        │           │        │          │             │             │                               │
-        ▼           │        ▼          ▼             ▼             ▼                               │
-   ┌─────────┐      │   ┌─────────┐  ┌───────┐  ┌─────────┐  ┌────────────────────┐               │
-   │  LM358  │      │   │ JST-GH  │  │ PC817 │  │ Micro SD│  │     MCP23017       │               │
-   │ Op-Amp  │      │   │CAN (J4) │  │ Opto  │  │  (J7)   │  │  I2C GPIO Expander │               │
-   └────┬────┘      │   └────┬────┘  │ (U5)  │  └─────────┘  │       (U7)         │               │
-        │           │        │       └───┬───┘               │                    │               │
-        ▼           │        │           │       ┌───────┐   │ GPA0-2: ENC1 (J13) │               │
-   ┌─────────┐      │        │       ┌───┴───┐   │LM1815 │   │ GPA3-5: ENC2 (J14) │  ┌─────────┐  │
-   │ JST-PH  │      │        │       │JST-PH │   │ VR IF │   │ GPA6-7,│           │  │  Debug  │  │
-   │PWM (J5) │      │        │       │RPM J11│   │ (U6)  │   │ GPB0:   ENC3 (J15) │  │J9/J10 │  │
-   └────┬────┘      │        │       └───┬───┘   └───┬───┘   │ GPB1-3: ENC4 (J16) │  └────┬────┘  │
-        │           │        │           │       ┌───┴───┐   │ GPB4-6: ENC5 (J17) │       │       │
-        ▼           │        ▼           ▼       │JST-PH │   └─────────┬──────────┘       ▼       │
-   Motor Ctrl       │    CAN Bus     Engine RPM  │VSS J12│             │              JTAG/UART   │
-   (0-5V PWM)       │  (CANH/CANL)   (12V Tach)  └───┬───┘    ┌────────┴────────┐      Debug     │
-                    │                                │        │                 │                 │
-                    │                                ▼        ▼                 ▼                 │
-                    │                          Vehicle    ┌───────┐  ┌───────┐  ┌───────┐        │
-                    │                           Speed     │ENC 1-5│  │ J13-  │  │Rotary │        │
-                    │                       (700R4 VR)    │via I2C│  │  J17  │  │Encoders        │
-                    │                                     └───────┘  └───────┘  └───────┘        │
-                    │                                                                             │
-                    │   Encoder Functions: J13=Power Steering, J14-J17=Future Expansion          │
-                    └────────────────────────────────────────────────────────────────────────────────┘
+                    ┌─────────────────────────────────────────────────────────────────────────────────────┐
+     12V IN         │                           MASTER CUSTOM PCB                                         │
+        │           │                                                                                     │
+        ▼           │   ┌─────────┐    ┌─────────────────────────────────────┐                           │
+   ┌─────────┐      │   │  USB-C  │    │     ESP32-S3-WROOM-1-N16R8         │                           │
+   │ MP2359  │──3.3V──►│  (J2)   │◄──►│                                     │                           │
+   │  Buck   │      │   │         │    │  GPIO 19/20: USB D+/D-             │                           │
+   └────┬────┘      │   └─────────┘    │  GPIO 1: RPM Input (PCNT)          │                           │
+        │           │                   │  GPIO 4: Water Temp (ADC)          │                           │
+        │           │                   │  GPIO 38: VSS Input (PCNT)         │                           │
+       12V──────────│───────────────────│  GPIO 47/48: I2C (MCP23017)        │                           │
+        │           │   ┌─────────┐    │  SPI1: MCP2515 (CAN)               │                           │
+        │           │   │ MCP2515 │◄──►│  SPI2: Slave Communication          │                           │
+        │           │   │   CAN   │    │  SPI3: SD Card                      │                           │
+        │           │   │ + TJA   │    │  GPIO 7: PWM Output                 │                           │
+        │           │   │  (J3)   │    └──────────────┬──────────────────────┘                           │
+        │           │   └────┬────┘     ┌─────────────┼─────────────┐                                    │
+        │           │        │          │             │             │                                    │
+        ▼           │        ▼          ▼             ▼             ▼                                    │
+   ┌─────────┐      │   ┌─────────┐  ┌───────┐  ┌─────────┐  ┌────────────────────┐  ┌───────────────┐  │
+   │  LM358  │      │   │ JST-GH  │  │ PC817 │  │ Micro SD│  │     MCP23017       │  │  Water Temp   │  │
+   │ Op-Amp  │      │   │CAN (J4) │  │ Opto  │  │  (J7)   │  │  I2C GPIO Expander │  │   Interface   │  │
+   └────┬────┘      │   └────┬────┘  │ (U5)  │  └─────────┘  │       (U7)         │  │  R27+C17+D5   │  │
+        │           │        │       └───┬───┘               │                    │  └───────┬───────┘  │
+        ▼           │        │           │       ┌───────┐   │ GPA0-2: ENC1 (J13) │          │          │
+   ┌─────────┐      │        │       ┌───┴───┐   │LM1815 │   │ GPA3-5: ENC2 (J14) │      ┌───┴───┐      │
+   │ JST-PH  │      │        │       │JST-PH │   │ VR IF │   │ GPA6-7,│           │      │JST-PH │      │
+   │PWM (J5) │      │        │       │RPM J11│   │ (U6)  │   │ GPB0:   ENC3 (J15) │      │WT J18 │      │
+   └────┬────┘      │        │       └───┬───┘   └───┬───┘   │ GPB1-3: ENC4 (J16) │      └───┬───┘      │
+        │           │        │           │       ┌───┴───┐   │ GPB4-6: ENC5 (J17) │          │          │
+        ▼           │        ▼           ▼       │JST-PH │   └─────────┬──────────┘          ▼          │
+   Motor Ctrl       │    CAN Bus     Engine RPM  │VSS J12│             │                  Coolant       │
+   (0-5V PWM)       │  (CANH/CANL)   (12V Tach)  └───┬───┘    ┌────────┴────────┐         Temp          │
+                    │                                │        │                 │       (LS1 CTS)       │
+                    │                                ▼        ▼                 ▼                       │
+                    │                          Vehicle    ┌───────┐  ┌───────┐  ┌───────┐  ┌─────────┐  │
+                    │                           Speed     │ENC 1-5│  │ J13-  │  │Rotary │  │  Debug  │  │
+                    │                       (700R4 VR)    │via I2C│  │  J17  │  │Encoders  │ J9/J10  │  │
+                    │                                     └───────┘  └───────┘  └───────┘  └─────────┘  │
+                    │                                                                                     │
+                    │   Encoder Functions: J13=Power Steering, J14-J17=Future Expansion                  │
+                    │   Sensor Inputs: J11=RPM, J12=VSS, J18=Water Temp                                  │
+                    └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Complete Schematic
@@ -1497,6 +1499,207 @@ All external peripheral connections use locking cable connectors for reliable au
        - Total encoder current: ~5mA each = 25mA max for all 5
 ```
 
+### Sheet 13: Water Temperature Input (LS1 Coolant Sensor)
+
+```
+                              WATER TEMPERATURE SENSOR INTERFACE
+════════════════════════════════════════════════════════════════════════════════
+
+    This circuit interfaces a GM LS1-style NTC thermistor coolant temperature
+    sensor with the ESP32-S3 ADC input for engine temperature monitoring.
+
+    Features:
+    - 1kΩ pull-up resistor for optimal ADC range in operating temps
+    - RC low-pass filter removes ignition noise
+    - ESD protection via Zener clamp
+    - Compatible with LS1, LS2, LS3, LS6, LS7, LT1, and similar GM sensors
+
+
+    WATER TEMP INPUT CONNECTOR (J18) - 2-Pin JST-PH
+    ════════════════════════════════════════════════
+
+                    ┌───────────┐
+                    │  1     2  │
+                    │  ○     ○  │
+                    └──┬─────┬──┘
+                       │     │
+                      SIG   GND
+                   (Sensor) (Chassis)
+
+    Pin Assignment:
+    ┌─────┬────────┬─────────────────────────────────────────────┐
+    │ Pin │ Signal │ Description                                 │
+    ├─────┼────────┼─────────────────────────────────────────────┤
+    │  1  │ SIG    │ Sensor signal wire (to CTS sensor)          │
+    │  2  │ GND    │ Chassis ground (to engine block)            │
+    └─────┴────────┴─────────────────────────────────────────────┘
+
+    Mating Connector: JST PHR-2 (housing) + SPH-002T-P0.5S (crimp terminals)
+
+
+    SENSOR SPECIFICATIONS (GM LS1 CTS - Part# 12146312)
+    ════════════════════════════════════════════════════
+
+    Type: NTC (Negative Temperature Coefficient) Thermistor
+    Configuration: Single-wire, grounded through engine block
+    Thread: 3/8" NPT
+
+    Resistance vs Temperature:
+    ┌────────────────┬────────────────┬────────────────────────────┐
+    │ Temperature    │ Resistance     │ ADC Output (12-bit, 1kΩ)   │
+    ├────────────────┼────────────────┼────────────────────────────┤
+    │ 70°F (21°C)    │ 3,400 Ω        │ 2.55V → 3161               │
+    │ 140°F (60°C)   │ 667 Ω          │ 1.32V → 1635               │
+    │ 195°F (90°C)   │ 200 Ω          │ 0.55V → 681                │
+    │ 220°F (104°C)  │ 120 Ω          │ 0.35V → 434                │
+    │ 230°F (110°C)  │ 100 Ω          │ 0.30V → 372                │
+    │ Open circuit   │ ∞              │ 3.3V → 4095                │
+    │ Short circuit  │ 0 Ω            │ 0V → 0                     │
+    └────────────────┴────────────────┴────────────────────────────┘
+
+
+    COMPLETE CIRCUIT SCHEMATIC
+    ══════════════════════════
+
+                                    3.3V
+                                     │
+                                    ┌┴┐
+                                R27 │ │ 1K (1/4W, 1%)
+                                    │ │ Pull-up resistor
+                                    └┬┘
+                                     │
+                                     ├──────────────────────────────────────┐
+                                     │                                      │
+                         ┌───────────┴───────────┐                          │
+                         │                       │                          │
+                        ═══ C17                 ┌┴┐                         │
+                        │   100nF               │ │ R28                     │
+                        │   (Filter)            │ │ 10K                     │
+                        │                       └┬┘ (ESD current limit)     │
+                       ─┴─                       │                          │
+                       ///                       │                          │
+                                                 │                          │
+           Sensor Wire (J18.1) ──────────────────┼──────────────────────────┤
+                    │                            │                          │
+                    │                           ─┴─                         │
+                    │                          ╱   ╲  D5                    │
+                    │                          ─────  BZT52C3V3 (3.3V Zener)│
+                    │                            │    (ESD/overvoltage)     │
+                    │                           ─┴─                         │
+                    │                           ///                         │
+                    │                                                       │
+                    │         RC Low-Pass Filter                            │
+                    │        ┌──────────────────────┐                       │
+                    │        │                      │                       │
+                    └────────┤ R29 = 1K     C18 ═══ ├───────────────────────┴─► GPIO 4 (U1)
+                             │              100nF  │                           (ADC1_CH3)
+                             │                │    │
+                             │               ─┴─   │
+                             │               ///   │
+                             │                     │
+                             └──────────────────────┘
+
+           Sensor Ground (J18.2) ────────────────────────────────────────────► GND
+           (Chassis ground - to engine block)
+
+
+    CIRCUIT DESCRIPTION
+    ═══════════════════
+
+    1. PULL-UP RESISTOR (R27 = 1kΩ):
+       - Creates voltage divider with NTC sensor
+       - 3.3V reference compatible with ESP32 ADC (no 5V needed)
+       - 1kΩ provides good resolution in 100-500Ω operating range
+       - Vout = 3.3V × R_sensor / (1000 + R_sensor)
+
+    2. FILTER CAPACITOR (C17 = 100nF):
+       - Filters high-frequency noise from engine electrical system
+       - Placed close to pull-up for best filtering
+       - Does not significantly affect DC voltage reading
+
+    3. ESD PROTECTION (R28 + D5):
+       - R28 (10kΩ) limits current during ESD events
+       - D5 (3.3V Zener BZT52C3V3) clamps voltage to safe level
+       - Protects GPIO from ignition noise and static discharge
+
+    4. LOW-PASS FILTER (R29 + C18):
+       - RC filter with fc = 1/(2π × 1000 × 0.0000001) ≈ 1.6kHz
+       - Removes high-frequency noise while preserving slow temp changes
+       - Temperature changes occur over seconds - 1.6kHz is conservative
+
+
+    DESIGN CALCULATIONS
+    ═══════════════════
+
+    1. Pull-up Current at max temp (70Ω sensor @ 266°F):
+       I_max = 3.3V / (1000Ω + 70Ω) = 3.1 mA
+       Well within sensor and resistor ratings.
+
+    2. Power Dissipation in R27:
+       P = I² × R = (0.0031)² × 1000 = 9.6 mW
+       1/4W (250mW) resistor has large safety margin.
+
+    3. ADC Resolution at operating temp (200Ω @ 195°F):
+       Vout = 3.3V × 200 / (1000 + 200) = 0.55V
+       ADC = 0.55V / 3.3V × 4095 = 681 counts
+       Change per 1°F near operating temp: ~15 ADC counts
+       Excellent resolution for temperature monitoring.
+
+    4. RC Filter Cutoff (R29, C18):
+       fc = 1 / (2π × 1000 × 100nF) = 1592 Hz
+       Removes ignition noise (typically >1kHz) effectively.
+
+
+    SIMPLIFIED CIRCUIT (MINIMUM PROTECTION)
+    ═══════════════════════════════════════
+
+    If space is limited, the following simplified circuit provides basic operation:
+
+                                    3.3V
+                                     │
+                                    ┌┴┐
+                                R27 │ │ 1K
+                                    └┬┘
+                                     │
+    Sensor Wire (J18.1) ─────────────┼──────────────────────────────────────► GPIO 4
+                                     │
+                                    ═══ C17
+                                    │   100nF
+                                    │
+                                   ─┴─
+                                   ///
+
+    Sensor Ground (J18.2) ──────────────────────────────────────────────────► GND
+
+    Note: Simplified circuit has reduced ESD protection. Use full circuit
+          for production automotive applications.
+
+
+    WIRING NOTES
+    ════════════
+
+    1. Sensor Location:
+       - LS1 has two CTS sensors - use the one for the gauge cluster
+       - Located on driver's side cylinder head (front)
+       - Single-wire sensor - case grounds through engine block
+
+    2. Wire Gauge:
+       - 18-22 AWG is sufficient for signal level
+       - Keep wire run under 3 meters if possible
+
+    3. Shielding:
+       - Shielded cable recommended for noise immunity
+       - Connect shield to GND at board end only (single-point ground)
+
+    4. Ground Connection:
+       - J18.2 should connect to engine block ground
+       - Ensure good chassis ground path for accurate readings
+
+    5. Heat Exposure:
+       - Wire should be rated for engine bay temperatures
+       - Use high-temp silicone or PTFE insulation wire (150°C+)
+```
+
 
     DEBUG USE CASES
     ═══════════════
@@ -1531,7 +1734,7 @@ All external peripheral connections use locking cable connectors for reliable au
 | 1 | RPM_IN | I | Optocoupler output (U5) | 12V square wave via PC817 |
 | 2 | COMM_SPI_MOSI | O | Slave MOSI (J6) | SPI to slave |
 | 3 | COMM_SPI_MISO | I | Slave MISO (J6) | SPI from slave |
-| 4 | - | - | Expansion | Available (was encoder) |
+| 4 | WATER_TEMP_IN | I | Water temp sensor (J18) | ADC1_CH3, NTC thermistor |
 | 5 | - | - | Expansion | Available (was encoder) |
 | 6 | - | - | Expansion | Available (was encoder) |
 | 7 | PWM_OUT | O | RC Filter (R1) | PWM motor control |
@@ -1605,7 +1808,12 @@ All external peripheral connections use locking cable connectors for reliable au
 | R24 | 10K | 0402/0603 | 1 | I2C SDA pull-up (MCP23017) |
 | R25 | 10K | 0402/0603 | 1 | I2C SCL pull-up (MCP23017) |
 | R26 | 10K | 0402/0603 | 1 | SPI slave CS pull-up (boot protection) |
+| R27 | 1K 1% | 0402/0603 | 1 | Water temp pull-up resistor |
+| R28 | 10K | 0402/0603 | 1 | Water temp ESD current limit |
+| R29 | 1K | 0402/0603 | 1 | Water temp RC filter resistor |
 | C16 | 100nF | 0402 | 1 | MCP23017 VCC bypass |
+| C17 | 100nF | 0402 | 1 | Water temp pull-up filter |
+| C18 | 100nF | 0402 | 1 | Water temp RC filter capacitor |
 
 ### Connectors (Locking Cable Connectors)
 
@@ -1628,6 +1836,7 @@ All external peripheral connections use locking cable connectors for reliable au
 | J15 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 3 - Future Use (via MCP23017) |
 | J16 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 4 - Future Use (via MCP23017) |
 | J17 | JST-XH Vertical | B5B-XH-A | 5 | Encoder 5 - Future Use (via MCP23017) |
+| J18 | JST-PH Vertical | B2B-PH-K-S | 2 | Water Temp (LS1 CTS sensor) |
 
 ### Mating Cable Connectors (for harness assembly)
 
@@ -1640,6 +1849,7 @@ All external peripheral connections use locking cable connectors for reliable au
 | J11 (RPM in) | PHR-2 | SPH-002T-P0.5S | JST-PH 2-pos |
 | J12 (VSS in) | PHR-2 | SPH-002T-P0.5S | JST-PH 2-pos |
 | J13-J17 (Encoders) | XHP-5 | SXH-001T-P0.6 | JST-XH 5-pos (×5) |
+| J18 (Water temp) | PHR-2 | SPH-002T-P0.5S | JST-PH 2-pos |
 
 ### Miscellaneous
 
@@ -1651,6 +1861,7 @@ All external peripheral connections use locking cable connectors for reliable au
 | D2 | SMBJ15A | 1 | TVS surge protection |
 | D3 | 1N4148 | 1 | RPM input reverse protection |
 | D4 | P6KE33CA | 1 | VSS transient protection (bidirectional) |
+| D5 | BZT52C3V3 | 1 | Water temp ESD/overvoltage clamp (3.3V Zener) |
 | JP1 | 2-pin header + jumper | 1 | CAN 120Ω termination select |
 
 ## PCB Design Notes
@@ -1756,20 +1967,23 @@ Design principles applied:
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                              INPUT ISOLATION ZONE                               │
 │                                                                                  │
-│   ┌─────────────────────┐     ┌─────────────────────┐                           │
-│   │   RPM INPUT SECTION │     │   VSS INPUT SECTION │     [RST]    [BOOT]       │
-│   │                     │     │                     │      SW1      SW2         │
-│   │  ┌───────┐ [D3]     │     │  ┌───────┐ [D4]     │                           │
-│   │  │ PC817 │ [R20,21] │     │  │LM1815 │ [R22,23] │                           │
-│   │  │  U5   │          │     │  │  U6   │ [C14,15] │                           │
-│   │  │ OPTO  │          │     │  │ VR IF │          │                           │
-│   │  └───────┘          │     │  └───────┘          │                           │
-│   │  ┌───────┐          │     │  ┌───────┐          │                           │
-│   │  │  J11  │ ←── EDGE │     │  │  J12  │ ←── EDGE │                           │
-│   │  │RPM IN │          │     │  │VSS IN │          │                           │
-│   │  │2-pin  │          │     │  │2-pin  │          │                           │
-│   │  └───────┘          │     │  └───────┘          │                           │
-│   └─────────────────────┘     └─────────────────────┘                           │
+│   ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐     │
+│   │   RPM INPUT SECTION │  │   VSS INPUT SECTION │  │  WATER TEMP SECTION │     │
+│   │                     │  │                     │  │                     │     │
+│   │  ┌───────┐ [D3]     │  │  ┌───────┐ [D4]     │  │  [D5]  [R27,28,29]  │     │
+│   │  │ PC817 │ [R20,21] │  │  │LM1815 │ [R22,23] │  │  [C17,C18]          │     │
+│   │  │  U5   │          │  │  │  U6   │ [C14,15] │  │  Voltage Divider    │     │
+│   │  │ OPTO  │          │  │  │ VR IF │          │  │  + RC Filter        │     │
+│   │  └───────┘          │  │  └───────┘          │  │                     │     │
+│   │  ┌───────┐          │  │  ┌───────┐          │  │  ┌───────┐          │     │
+│   │  │  J11  │ ←── EDGE │  │  │  J12  │ ←── EDGE │  │  │  J18  │ ←── EDGE │     │
+│   │  │RPM IN │          │  │  │VSS IN │          │  │  │WT IN  │          │     │
+│   │  │2-pin  │          │  │  │2-pin  │          │  │  │2-pin  │          │     │
+│   │  └───────┘          │  │  └───────┘          │  │  └───────┘          │     │
+│   └─────────────────────┘  └─────────────────────┘  └─────────────────────┘     │
+│                                                                                  │
+│                                                       [RST]    [BOOT]           │
+│                                                        SW1      SW2             │
 │                                                                                  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                BOTTOM EDGE                                      │
@@ -1804,7 +2018,7 @@ Design principles applied:
 | **Analog Zone** (Mid-Left) | U3, J5, RC filter | Isolated from digital noise, dedicated ground pour |
 | **Logic Zone** (Center) | U7, decoupling | Central routing hub for I2C/SPI |
 | **Storage Zone** (Mid-Right) | J7, J9 | Edge access for SD card and debug probe |
-| **Input Isolation** (Lower) | U5, U6, J11, J12, D3, D4 | Automotive signals isolated from logic |
+| **Input Isolation** (Lower) | U5, U6, J11, J12, J18, D3-D5 | Automotive signals isolated from logic |
 | **Interface Zone** (Bottom) | J6, J13-J17, J8, J10 | All cable connectors accessible from edge |
 
 ### Signal Routing Priority
@@ -1858,6 +2072,7 @@ Route in this order to minimize interference:
 | J11 (RPM Input) | Bottom-Left | Vertical | Down |
 | J12 (VSS Input) | Bottom-Center | Vertical | Down |
 | J13-J17 (Encoders) | Bottom | Vertical | Down |
+| J18 (Water Temp) | Bottom-Center | Vertical | Down |
 
 ### Test Point Locations
 

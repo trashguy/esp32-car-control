@@ -10,6 +10,8 @@
 static MasterDataCallback masterCallback = nullptr;
 static volatile uint16_t lastRpm = 0;
 static volatile uint8_t lastMasterMode = MODE_AUTO;
+static volatile int16_t lastWaterTempF10 = WATER_TEMP_INVALID;
+static volatile uint8_t lastWaterTempStatus = WATER_TEMP_STATUS_DISABLED;
 static volatile unsigned long lastPacketTime = 0;
 static volatile uint32_t validPacketCount = 0;
 static volatile uint32_t invalidPacketCount = 0;
@@ -197,6 +199,8 @@ void spiSlaveProcess() {
                     
                     lastRpm = extractSpiRpm(currentRxBuffer);
                     lastMasterMode = extractSpiMode(currentRxBuffer);
+                    lastWaterTempF10 = extractSpiWaterTempF10(currentRxBuffer);
+                    lastWaterTempStatus = extractSpiWaterTempStatus(currentRxBuffer);
                     lastPacketTime = millis();
                     validPacketCount++;
 
@@ -309,4 +313,12 @@ bool spiSlaveCheckReconnected() {
         return true;
     }
     return false;
+}
+
+int16_t spiSlaveGetWaterTempF10() {
+    return lastWaterTempF10;
+}
+
+uint8_t spiSlaveGetWaterTempStatus() {
+    return lastWaterTempStatus;
 }

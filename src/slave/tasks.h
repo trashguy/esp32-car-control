@@ -42,6 +42,8 @@ typedef struct {
     uint8_t mode;
     bool connected;
     bool forceRefresh;  // True on reconnection
+    int16_t waterTempF10;      // Water temp in 0.1°F units (e.g., 1850 = 185.0°F)
+    uint8_t waterTempStatus;   // WATER_TEMP_STATUS_* from protocol.h
 } SpiToDisplayMsg;
 
 // Message from Display task to SPI task

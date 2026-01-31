@@ -5,6 +5,7 @@
 #include "master/sd_handler.h"
 #include "can_handler.h"
 #include "rpm_counter.h"
+#include "water_temp.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include "shared/version.h"
@@ -120,6 +121,14 @@ void setup() {
         Serial.println("WARNING: RPM counter init failed");
     }
 
+    // Initialize water temperature sensor (starts disabled)
+    // Enable with 'w' command, disable with 'W' command
+    if (waterTempInit()) {
+        Serial.printf("Water temp: GPIO %d (disabled, use 'w' to enable)\n", WATER_TEMP_INPUT_PIN);
+    } else {
+        Serial.println("WARNING: Water temp sensor init failed");
+    }
+
     Serial.println("\nStarting tasks...\n");
 
     // Start all FreeRTOS tasks
@@ -138,7 +147,7 @@ void setup() {
                   FAILSAFE_PWM_DUTY, FAILSAFE_PWM_DUTY * 100.0 / 255.0);
     Serial.println("=======================\n");
 
-    Serial.println("Commands: c=stats, h=health, T=tasks, p/P=pulse rpm on/off, ?=help\n");
+    Serial.println("Commands: c=stats, h=health, T=tasks, p/P=pulse rpm on/off, w/W=water temp on/off, ?=help\n");
 }
 
 void loop() {

@@ -146,6 +146,14 @@
 #define VSS_INPUT_PIN      38   // GPIO 38 - expansion GPIO
 #define VSS_PULSES_PER_MILE 8000  // GM 700R4 transmission
 
+// Master - Water Temperature Sensor (GM LS1 Coolant Temperature Sensor)
+// NTC thermistor with 1kΩ pull-up to 3.3V creates voltage divider
+// ADC reads 0-3.3V proportional to sensor resistance (temp)
+// See docs/schematics/water-temp-input-circuit.md for circuit details
+#define WATER_TEMP_INPUT_PIN    4     // GPIO 4 - ADC1_CH3
+#define WATER_TEMP_PULLUP_OHMS  1000  // 1kΩ pull-up resistor
+#define WATER_TEMP_ADC_ATTEN    ADC_ATTEN_DB_12  // Full 0-3.3V range
+
 // Slave - ILI9341 SPI Pins (configured via TFT_eSPI build flags in platformio.ini)
 // TFT_SCLK=12, TFT_MISO=13, TFT_MOSI=11, TFT_CS=10, TFT_DC=46, TFT_RST=-1 (shared with ESP32-S3)
 
