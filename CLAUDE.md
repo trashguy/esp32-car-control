@@ -4,51 +4,70 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ESP32 Arduino project intended for AI/ML experimentation. Uses PlatformIO as the build system with the Arduino framework.
+ESP32-S3 dual-MCU car control system with OTA firmware updates. Uses PlatformIO with the Arduino framework.
+
+- **Display MCU (slave)**: TFT touch display, WiFi, SD card, OTA reception
+- **Controller MCU (master)**: CAN bus, sensors, motor control
 
 ## Build Commands
 
 ```bash
-# Build the project
-pio run
+# Build both MCU firmwares
+make firmware
 
-# Build for specific environment (if multiple boards configured)
-pio run -e esp32dev
+# Build individually
+make display      # Display MCU (slave)
+make controller   # Controller MCU (master)
 
-# Upload to connected ESP32
-pio run -t upload
+# Create OTA update package
+make package
 
-# Monitor serial output (115200 baud)
-pio device monitor
+# Discover devices and upload OTA package
+make discover
+make upload
 
-# Build and upload and monitor in one command
-pio run -t upload -t monitor
+# USB flash (initial programming)
+make flash-display
+make flash-controller
+
+# Serial monitor
+make monitor
 
 # Clean build artifacts
-pio run -t clean
+make clean
 ```
+
+See `BUILD.md` for comprehensive build documentation.
 
 ## Project Structure
 
 ```
-src/          - Main source files (.cpp)
-include/      - Header files (.h)
-lib/          - Project-specific libraries
-platformio.ini - Build configuration and dependencies
+src/
+├── master/       - Controller MCU source
+└── slave/        - Display MCU source
+include/
+├── master/       - Controller headers
+├── slave/        - Display headers
+└── shared/       - Common protocol/config
+hardware/         - PCB schematics (EasyEDA/KiCad)
+tools/
+└── ota-pusher/   - Desktop OTA upload tool
+docs/             - Technical documentation
 ```
+
+## Key Files
+
+- `platformio.ini` - PlatformIO build configuration
+- `Makefile` - Build orchestration
+- `VERSION` - Firmware version (semantic versioning)
+- `include/shared/config.h` - Pin assignments and constants
+- `include/shared/protocol.h` - SPI protocol definitions
 
 ## Adding Libraries
 
-Add dependencies to `platformio.ini` under the environment:
+Add dependencies to `platformio.ini`:
 ```ini
 lib_deps =
     library_name
     username/library_name@^1.0.0
 ```
-
-## ESP32 Considerations
-
-- Default board: `esp32dev` (generic ESP32)
-- ESP32-S3 environment available (uncomment in platformio.ini) - recommended for AI workloads due to vector instructions and PSRAM support
-- Serial monitor runs at 115200 baud
-- Use `ESP.getFreeHeap()` to monitor memory during development
