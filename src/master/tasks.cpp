@@ -1,6 +1,7 @@
 #include "tasks.h"
 #include "master/spi_master.h"
 #include "master/sd_handler.h"
+#include "master/ota_handler.h"
 #include "can_handler.h"
 #include "rpm_counter.h"
 #include "encoder_mux.h"
@@ -403,9 +404,26 @@ static void taskSpiComm(void* param) {
     const TickType_t period = pdMS_TO_TICKS(SPI_TASK_PERIOD_MS);
 
     Serial.println("[SPI Task] Started");
+    
+    // Initialize OTA handler
+    masterOtaInit();
 
     while (true) {
         uint32_t now = millis();
+        
+        // Check for OTA updates (this polls slave periodically)
+        if (masterOtaProcess()) {
+            // OTA is in progress - skip normal SPI exchange
+            // Still need to maintain watchdog
+            if (masterOtaGetState() == MASTER_OTA_COMPLETE && masterOtaRebootPending()) {
+                // Update complete - reboot
+                Serial.println("[SPI Task] OTA complete, rebooting...");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                masterOtaReboot();
+            }
+            vTaskDelayUntil(&lastWakeTime, period);
+            continue;
+        }
 
         // Update simulation if in simulate mode
         if (masterState.opMode == OP_MODE_SIMULATE &&

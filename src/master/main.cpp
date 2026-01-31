@@ -7,6 +7,7 @@
 #include "rpm_counter.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
+#include "shared/version.h"
 
 #if VIRTUAL_MEMORY
 #include "master/virtual_memory.h"
@@ -46,6 +47,8 @@ void setup() {
     Serial.println("\n\n========================================");
     Serial.println("  ESP32-S3 CAN-to-SPI Master (FreeRTOS)");
     Serial.println("  SAFETY-CRITICAL BUILD");
+    Serial.printf("  Version: %s\n", FIRMWARE_VERSION);
+    Serial.printf("  Built: %s\n", BUILD_TIMESTAMP);
     Serial.println("========================================\n");
 
     Serial.printf("CPU: %d MHz, Heap: %d bytes\n",

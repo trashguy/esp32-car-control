@@ -1,5 +1,7 @@
 #include "screen_settings.h"
 #include "sd_card.h"
+#include "usb_msc.h"
+#include "shared/version.h"
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -14,6 +16,9 @@ static TouchState touchState = {false, -1, false};
 static bool backButtonPressed = false;
 static bool sdButtonPressed = false;
 static bool wifiButtonPressed = false;
+#if PRODUCTION_BUILD
+static bool usbButtonPressed = false;
+#endif
 
 // WiFi SSID storage for display
 extern char wifiSsid[];  // Defined in screen_wifi.cpp
@@ -52,6 +57,42 @@ static void drawWifiButton(bool pressed) {
     drawWifiIcon(cx, cy, SETTINGS_WIFI_BTN_SIZE - 12, COLOR_BTN_TEXT);
 }
 
+#if PRODUCTION_BUILD
+static void drawUsbButton(bool pressed) {
+    TFT_eSPI& tft = getTft();
+    bool enabled = usbMscIsEnabled();
+    
+    // Use different colors based on enabled state
+    uint16_t btnColor;
+    uint16_t iconColor;
+    
+    if (pressed) {
+        btnColor = COLOR_BTN_PRESSED;
+        iconColor = COLOR_BTN_TEXT;
+    } else if (enabled) {
+        btnColor = COLOR_CONNECTED;  // Green when enabled
+        iconColor = COLOR_BACKGROUND;
+    } else {
+        btnColor = COLOR_BTN_NORMAL;
+        iconColor = COLOR_BTN_TEXT;
+    }
+    
+    int16_t cx = USB_BTN_X + USB_BTN_SIZE / 2;
+    int16_t cy = USB_BTN_Y + USB_BTN_SIZE / 2;
+
+    tft.fillRoundRect(USB_BTN_X, USB_BTN_Y, USB_BTN_SIZE, USB_BTN_SIZE, 6, btnColor);
+    tft.drawRoundRect(USB_BTN_X, USB_BTN_Y, USB_BTN_SIZE, USB_BTN_SIZE, 6, COLOR_BTN_TEXT);
+
+    // Draw USB icon (simple representation)
+    // USB connector shape
+    tft.fillRoundRect(cx - 8, cy - 6, 16, 10, 2, iconColor);
+    tft.fillRect(cx - 5, cy + 4, 10, 4, iconColor);
+    // USB pins
+    tft.fillRect(cx - 4, cy - 3, 2, 4, btnColor);
+    tft.fillRect(cx + 2, cy - 3, 2, 4, btnColor);
+}
+#endif // PRODUCTION_BUILD
+
 static void drawDiagnosticsContent() {
     TFT_eSPI& tft = getTft();
 
@@ -83,6 +124,13 @@ static void drawDiagnosticsContent() {
         } \
         baseY += 8; \
     } while(0)
+
+    // Firmware section
+    DRAW_LINE("Firmware:", FIRMWARE_VERSION, COLOR_RPM_TEXT);
+    DRAW_LINE("Built:", BUILD_TIMESTAMP, COLOR_RPM_TEXT);
+    
+    baseY += 5;
+    DRAW_SEPARATOR();
 
     // SD Card section
     if (sdCardPresent()) {
@@ -169,9 +217,12 @@ void screenSettingsDraw() {
     drawBackButton(false);
     drawWifiButton(false);
 
-    // Only show SD button if card present
+    // Only show SD and USB buttons if card present
     if (sdCardPresent()) {
         drawSdButton(false);
+#if PRODUCTION_BUILD
+        drawUsbButton(false);
+#endif
     }
 
     drawWifiStatusIndicator();
@@ -204,6 +255,17 @@ void screenSettingsHandleTouch(int16_t x, int16_t y, bool pressed) {
             drawWifiButton(true);
             Serial.println("WIFI button pressed");
         }
+
+        // Check USB button (production build only)
+#if PRODUCTION_BUILD
+        if (sdCardPresent() &&
+            pointInRect(x, y, USB_BTN_X, USB_BTN_Y, USB_BTN_SIZE, USB_BTN_SIZE) &&
+            !usbButtonPressed) {
+            usbButtonPressed = true;
+            drawUsbButton(true);
+            Serial.println("USB button pressed");
+        }
+#endif
 
         // Handle scrolling in content area
         if (y >= DIAG_CONTENT_Y && y < DIAG_CONTENT_Y + DIAG_CONTENT_H) {
@@ -243,13 +305,40 @@ void screenSettingsHandleTouch(int16_t x, int16_t y, bool pressed) {
             Serial.println("Switching to WiFi screen");
         }
 
+#if PRODUCTION_BUILD
+        if (usbButtonPressed) {
+            usbButtonPressed = false;
+            // Toggle USB MSC state
+            if (usbMscIsEnabled()) {
+                usbMscDisable();
+                Serial.println("USB Mass Storage disabled");
+            } else {
+                usbMscEnable();
+                Serial.println("USB Mass Storage enabled");
+            }
+            drawUsbButton(false);  // Redraw with new state
+        }
+#endif
+
         touchState.isDragging = false;
         touchState.lastTouchY = -1;
     }
 }
 
+// Track last known USB state to detect changes
+#if PRODUCTION_BUILD
+static bool lastUsbEnabled = false;
+#endif
+
 void screenSettingsUpdate() {
-    // Nothing to update currently
+#if PRODUCTION_BUILD
+    // Check if USB state changed (e.g., host ejected) and update button
+    bool currentUsbEnabled = usbMscIsEnabled();
+    if (currentUsbEnabled != lastUsbEnabled) {
+        lastUsbEnabled = currentUsbEnabled;
+        drawUsbButton(false);
+    }
+#endif
 }
 
 void screenSettingsReset() {
@@ -258,4 +347,8 @@ void screenSettingsReset() {
     backButtonPressed = false;
     sdButtonPressed = false;
     wifiButtonPressed = false;
+#if PRODUCTION_BUILD
+    usbButtonPressed = false;
+    lastUsbEnabled = usbMscIsEnabled();  // Sync with current state
+#endif
 }

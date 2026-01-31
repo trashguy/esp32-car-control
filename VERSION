@@ -1,0 +1,9 @@
+# Firmware Version
+# Update this file when releasing a new version
+# Format: MAJOR.MINOR.PATCH
+# 
+# MAJOR: Breaking changes, incompatible protocol updates
+# MINOR: New features, backward-compatible
+# PATCH: Bug fixes, minor improvements
+
+VERSION=1.0.0

@@ -147,6 +147,7 @@ float rate = vmem.hitRate();         // 0.0 - 1.0 (target: >80%)
 | WiFi Settings | Configure WiFi connection via touch UI |
 | QWERTY Keyboard | Full-screen keyboard for text input |
 | SD Card Support | SDMMC interface for file storage |
+| USB Mass Storage | Expose SD card as USB drive (production build only) |
 | Status Indicators | CONNECTED, SYNCED, SYNCING, NO SIGNAL states |
 
 ### Slave FreeRTOS Architecture
@@ -181,6 +182,7 @@ The slave device uses FreeRTOS tasks for concurrent operation, ensuring responsi
 **Serial Debug Commands:**
 - `c` - Show statistics (packet counts, task stack usage, heap)
 - `t` - Show task state and priorities
+- `e` - Eject USB mass storage (production build only)
 - `?` - Help
 
 ## Pin Assignments
@@ -305,7 +307,8 @@ pio run
 
 # Build for specific environment
 pio run -e master    # Build master only
-pio run -e slave     # Build slave only
+pio run -e slave     # Build slave (development)
+pio run -e slave_prod # Build slave (production with USB MSC)
 
 # Upload to connected ESP32
 pio run -t upload -e master
@@ -320,6 +323,61 @@ pio run -t upload -t monitor -e master
 # Clean build artifacts
 pio run -t clean
 ```
+
+## Slave Build Environments
+
+The slave device has two build environments to handle the USB hardware limitations of ESP32-S3:
+
+| Environment | USB Mode | Features | Flash Method |
+|-------------|----------|----------|--------------|
+| `slave` | Hardware USB-JTAG | Easy flashing, no USB MSC | Automatic |
+| `slave_prod` | TinyUSB | USB Mass Storage + Serial | BOOT button required |
+
+### Development Build (slave)
+
+Uses `ARDUINO_USB_MODE=1` (hardware USB-JTAG) for easy flashing:
+
+```bash
+pio run -e slave -t upload
+```
+
+- Auto-reset works normally
+- No USB Mass Storage capability
+- USB button hidden in Settings screen
+- Recommended for active development
+
+### Production Build (slave_prod)
+
+Uses `ARDUINO_USB_MODE=0` (TinyUSB) for USB Mass Storage:
+
+```bash
+# First, enter bootloader mode:
+# 1. Unplug USB cable
+# 2. Hold BOOT button on ESP32-S3
+# 3. Plug in USB cable (keep holding BOOT)
+# 4. Wait 2 seconds, release BOOT button
+
+# Then flash:
+pio run -e slave_prod -t upload
+```
+
+**Features:**
+- USB Mass Storage to copy files (BMP images) to SD card via USB
+- Serial console still available (CDC + MSC composite device)
+- USB button visible in Settings screen (green when enabled)
+- Toggle USB MSC via touchscreen or serial command 'e' to eject
+
+**Bootloader Recovery:**
+
+If the device becomes unresponsive or only shows as a mass storage device:
+
+1. Unplug USB cable
+2. Hold BOOT button
+3. Plug in USB cable (keep holding BOOT)
+4. Wait 2 seconds, release BOOT
+5. Flash immediately with `pio run -e slave_prod -t upload`
+
+**Note:** The BOOT button sequence is required because TinyUSB mode doesn't support the automatic reset-to-bootloader feature of hardware USB-JTAG.
 
 ## Project Structure
 

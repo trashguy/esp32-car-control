@@ -1,9 +1,12 @@
 #include "tasks.h"
 #include "slave/spi_slave.h"
+#include "slave/ota_handler.h"
 #include "display.h"
+#include "usb_msc.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include <Arduino.h>
+#include <WiFi.h>
 
 // =============================================================================
 // Global Synchronization Objects
@@ -212,6 +215,9 @@ static void taskDisplay(void* parameter) {
         // TFT mutex is taken/released inside displayLoop
         displayLoop();
 
+        // Process OTA events (non-blocking)
+        otaHandlerLoop();
+
         // Delay until next frame
         vTaskDelayUntil(&lastWakeTime, taskPeriod);
     }
@@ -268,6 +274,42 @@ static void taskSerial(void* parameter) {
                     Serial.println();
                     break;
 
+                case 'w':
+                case 'W':
+                    Serial.println("\n=== WiFi Status ===");
+                    Serial.printf("Status: %d (%s)\n", WiFi.status(),
+                        WiFi.status() == WL_CONNECTED ? "Connected" :
+                        WiFi.status() == WL_DISCONNECTED ? "Disconnected" :
+                        WiFi.status() == WL_NO_SSID_AVAIL ? "SSID not found" :
+                        WiFi.status() == WL_CONNECT_FAILED ? "Connect failed" :
+                        WiFi.status() == WL_IDLE_STATUS ? "Idle" : "Other");
+                    if (WiFi.status() == WL_CONNECTED) {
+                        Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
+                        Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+                        Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
+                    }
+                    Serial.println();
+                    break;
+
+                case 'o':
+                case 'O':
+                    Serial.println("\n=== OTA Status ===");
+                    Serial.printf("State: %d\n", otaGetState());
+                    Serial.printf("Progress: %d%%\n", otaGetProgress());
+                    if (otaGetState() == OTA_STATE_ERROR) {
+                        Serial.printf("Error: %s\n", otaGetErrorMessage());
+                    }
+                    Serial.println();
+                    break;
+
+                case 'r':
+                case 'R':
+                    Serial.println("\n=== Resetting OTA State ===");
+                    otaClearState();
+                    Serial.println("OTA state reset to IDLE");
+                    Serial.println();
+                    break;
+
                 case '?':
                 case 'h':
                 case 'H':
@@ -275,9 +317,28 @@ static void taskSerial(void* parameter) {
                     Serial.println("Commands:");
                     Serial.println("  c - Show statistics");
                     Serial.println("  t - Show task info");
+                    Serial.println("  w - Show WiFi status");
+                    Serial.println("  o - Show OTA status");
+                    Serial.println("  r - Reset OTA state");
+#if PRODUCTION_BUILD
+                    Serial.println("  e - Eject USB mass storage");
+#endif
                     Serial.println("  ? - Show this help");
                     Serial.println();
                     break;
+
+#if PRODUCTION_BUILD
+                case 'e':
+                case 'E':
+                    if (usbMscIsEnabled()) {
+                        Serial.println("Ejecting USB mass storage...");
+                        usbMscEject();
+                        Serial.println("USB MSC ejected. Safe to flash.");
+                    } else {
+                        Serial.println("USB MSC not enabled.");
+                    }
+                    break;
+#endif
 
                 default:
                     break;

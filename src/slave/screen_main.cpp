@@ -1,5 +1,7 @@
 #include "screen_main.h"
 #include "slave/spi_slave.h"
+#include "slave/ota_handler.h"
+#include "slave/ota_popup.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include <Arduino.h>
@@ -203,9 +205,25 @@ void screenMainDraw() {
     drawGearButton(gearButtonPressed);
     drawModeButton(modeButtonPressed);
     drawWifiStatusIndicator();
+
+    // Draw OTA popup overlay if visible
+    if (otaPopupIsVisible()) {
+        otaPopupDraw();
+    }
 }
 
 void screenMainHandleTouch(int16_t x, int16_t y, bool pressed) {
+    // Debug: log touch events when popup is visible
+    if (otaPopupIsVisible()) {
+        Serial.printf("[Main] OTA popup touch: x=%d, y=%d, pressed=%d\n", x, y, pressed);
+    }
+    
+    // Let OTA popup handle touch first if visible
+    if (otaPopupIsVisible()) {
+        otaPopupHandleTouch(x, y, pressed);
+        return;
+    }
+
     if (pressed) {
         // Check gear button
         if (pointInRect(x, y, GEAR_BTN_X, GEAR_BTN_Y, GEAR_BTN_SIZE, GEAR_BTN_SIZE) &&
@@ -285,6 +303,19 @@ void screenMainHandleTouch(int16_t x, int16_t y, bool pressed) {
 }
 
 void screenMainUpdate() {
+    // Check for pending OTA update and show popup
+    if (!otaPopupIsVisible() && otaGetState() == OTA_STATE_PACKAGE_READY) {
+        otaPopupShow();
+        // Redraw the screen with popup overlay
+        screenMainDraw();
+    }
+
+    // Update OTA popup if visible
+    if (otaPopupIsVisible()) {
+        otaPopupUpdate();
+        return;  // Skip other updates while popup is active
+    }
+
     // Handle blink animation for disconnected state
     if (currentState == DISPLAY_NO_SIGNAL) {
         unsigned long now = millis();
@@ -308,7 +339,8 @@ void screenMainUpdateRpm(uint16_t rpm, bool connected) {
     if (rpm != displayedRpm || currentState != DISPLAY_CONNECTED) {
         displayedRpm = rpm;
         currentState = DISPLAY_CONNECTED;
-        if (getCurrentScreen() == SCREEN_MAIN) {
+        // Don't redraw if OTA popup is visible (it would overdraw the popup)
+        if (getCurrentScreen() == SCREEN_MAIN && !otaPopupIsVisible()) {
             drawRpmValue(rpm, true);
             drawStatusIndicator(true);
         }
@@ -325,7 +357,8 @@ void screenMainSetConnected(bool connected) {
     if (stateChanged || syncChanged) {
         currentState = newState;
         lastSyncState = currentSyncState;
-        if (getCurrentScreen() == SCREEN_MAIN) {
+        // Don't redraw if OTA popup is visible (it would overdraw the popup)
+        if (getCurrentScreen() == SCREEN_MAIN && !otaPopupIsVisible()) {
             if (!connected) {
                 drawRpmValue(0, false);
             }

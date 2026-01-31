@@ -6,6 +6,7 @@
 #include "screen_settings.h"
 #include "screen_filebrowser.h"
 #include "screen_wifi.h"
+#include "usb_msc.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include <Arduino.h>
@@ -16,6 +17,8 @@
 
 static ScreenType currentScreen = SCREEN_MAIN;
 static bool lastTouchState = false;
+static int16_t lastTouchX = 0;
+static int16_t lastTouchY = 0;
 static unsigned long lastWifiStatusCheck = 0;
 static bool lastWifiConnected = false;
 
@@ -122,6 +125,10 @@ ScreenType displayGetScreen() {
 // =============================================================================
 
 void displayLoop() {
+    // Check for USB MSC eject from host (clear flag regardless of screen)
+    // This prevents the flag from accumulating if user is on a different screen
+    usbMscCheckEjected();
+    
     // Periodic WiFi status check (not during keyboard input)
     if (!screenWifiKeyboardVisible() && millis() - lastWifiStatusCheck > 1000) {
         lastWifiStatusCheck = millis();
@@ -135,6 +142,17 @@ void displayLoop() {
     // Get touch input
     int16_t touchX, touchY;
     bool currentTouch = touchGetPoint(&touchX, &touchY);
+    
+    // Preserve last valid touch position for release events
+    // When touch is released, we need to know WHERE the finger was lifted
+    if (currentTouch) {
+        lastTouchX = touchX;
+        lastTouchY = touchY;
+    } else {
+        // Use last known position for release event
+        touchX = lastTouchX;
+        touchY = lastTouchY;
+    }
 
     // Dispatch to current screen
     switch (currentScreen) {

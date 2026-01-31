@@ -8,6 +8,9 @@
 static SPIClass* commSpi = nullptr;
 static SPISettings spiSettings(COMM_SPI_FREQUENCY, MSBFIRST, SPI_MODE0);
 
+// Use same SPI settings for OTA (full speed)
+static SPISettings spiSettingsOta(COMM_SPI_FREQUENCY, MSBFIRST, SPI_MODE0);
+
 static uint32_t successCount = 0;
 static uint32_t errorCount = 0;
 
@@ -73,4 +76,57 @@ uint32_t spiGetSuccessCount() {
 
 uint32_t spiGetErrorCount() {
     return errorCount;
+}
+
+// =============================================================================
+// OTA SPI Functions
+// =============================================================================
+
+bool spiOtaExchange(const uint8_t* txBuffer, uint8_t* rxBuffer, size_t len) {
+    if (!commSpi) return false;
+    
+    // Use slower SPI settings for OTA (more reliable over jumper wires)
+    commSpi->beginTransaction(spiSettingsOta);
+    digitalWrite(COMM_SPI_CS_PIN, LOW);
+    
+    delayMicroseconds(100);  // Slave DMA prep time
+    
+    // Use transferBytes for proper SPI exchange
+    commSpi->transferBytes(txBuffer, rxBuffer, len);
+    
+    delayMicroseconds(10);
+    
+    digitalWrite(COMM_SPI_CS_PIN, HIGH);
+    commSpi->endTransaction();
+    
+    delayMicroseconds(50);  // Gap for slave to re-queue
+    
+    return true;
+}
+
+bool spiOtaExchangeBulk(const uint8_t* txBuffer, uint8_t* rxBuffer, size_t len) {
+    if (!commSpi) return false;
+    
+    // Use slower SPI settings for OTA bulk transfers (more reliable over jumper wires)
+    commSpi->beginTransaction(spiSettingsOta);
+    digitalWrite(COMM_SPI_CS_PIN, LOW);
+    
+    delayMicroseconds(200);  // Longer prep time for bulk transfer
+    
+    // Transfer in chunks to avoid issues with large transfers
+    size_t offset = 0;
+    while (offset < len) {
+        size_t chunkSize = min(len - offset, (size_t)64);  // 64 bytes at a time
+        commSpi->transferBytes(txBuffer + offset, rxBuffer + offset, chunkSize);
+        offset += chunkSize;
+    }
+    
+    delayMicroseconds(10);
+    
+    digitalWrite(COMM_SPI_CS_PIN, HIGH);
+    commSpi->endTransaction();
+    
+    delayMicroseconds(100);  // Longer gap after bulk transfer
+    
+    return true;
 }

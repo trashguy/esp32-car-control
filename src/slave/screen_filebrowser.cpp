@@ -1,5 +1,6 @@
 #include "screen_filebrowser.h"
 #include "sd_card.h"
+#include "usb_msc.h"
 #include <Arduino.h>
 #include <SD_MMC.h>
 
@@ -15,9 +16,48 @@ static TouchState touchState = {false, -1, false};
 // Button state
 static bool arrowButtonPressed = false;
 
+// USB lock state - tracks if we're showing the locked overlay
+static bool usbLockedDisplayed = false;
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
+
+// Draw USB locked overlay - shows when SD card is mounted via USB
+static void drawUsbLockedOverlay() {
+    TFT_eSPI& tft = getTft();
+
+    const int16_t boxMargin = 8;
+    const int16_t boxX = boxMargin;
+    const int16_t boxY = FILE_LIST_Y_START - 4;
+    const int16_t boxW = SCREEN_WIDTH - (boxMargin * 2);
+    const int16_t boxH = FILE_LIST_Y_END - FILE_LIST_Y_START + 8;
+
+    // Draw dark overlay box
+    tft.fillRect(boxX, boxY, boxW, boxH, COLOR_BACKGROUND);
+    tft.drawRect(boxX, boxY, boxW, boxH, COLOR_DISCONNECTED);
+
+    // Draw USB icon (simple representation)
+    int16_t centerX = SCREEN_WIDTH / 2;
+    int16_t centerY = (FILE_LIST_Y_START + FILE_LIST_Y_END) / 2 - 20;
+
+    // USB connector shape
+    tft.fillRoundRect(centerX - 15, centerY - 10, 30, 20, 3, COLOR_LABEL);
+    tft.fillRect(centerX - 10, centerY + 10, 20, 8, COLOR_LABEL);
+    tft.fillRect(centerX - 6, centerY - 4, 4, 8, COLOR_BACKGROUND);
+    tft.fillRect(centerX + 2, centerY - 4, 4, 8, COLOR_BACKGROUND);
+
+    // Lock message
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_DISCONNECTED, COLOR_BACKGROUND);
+    tft.drawString("SD LOCKED", centerX, centerY + 45);
+
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
+    tft.drawString("Mounted via USB", centerX, centerY + 65);
+    tft.drawString("Eject from PC to unlock", centerX, centerY + 80);
+}
 
 static void clearFileList() {
     for (int i = 0; i < fileCount; i++) {
@@ -148,9 +188,16 @@ void screenFileBrowserDraw() {
     // Horizontal line
     tft.drawLine(20, 35, SCREEN_WIDTH - 20, 35, COLOR_LABEL);
 
-    // Load and draw file list
-    loadFileList();
-    drawFileListArea();
+    // Check if SD card is mounted via USB
+    if (usbMscMounted()) {
+        usbLockedDisplayed = true;
+        drawUsbLockedOverlay();
+    } else {
+        usbLockedDisplayed = false;
+        // Load and draw file list
+        loadFileList();
+        drawFileListArea();
+    }
 
     // Draw back arrow button
     drawArrowButton(false);
@@ -160,12 +207,17 @@ void screenFileBrowserDraw() {
 
 void screenFileBrowserHandleTouch(int16_t x, int16_t y, bool pressed) {
     if (pressed) {
-        // Check back arrow button
+        // Check back arrow button (always allow going back)
         if (pointInRect(x, y, ARROW_BTN_X, ARROW_BTN_Y, ARROW_BTN_SIZE, ARROW_BTN_SIZE) &&
             !arrowButtonPressed) {
             arrowButtonPressed = true;
             drawArrowButton(true);
             Serial.println("ARROW button pressed");
+        }
+
+        // Block file list interactions when USB mounted
+        if (usbLockedDisplayed) {
+            return;
         }
 
         // Handle scrolling in file list area
@@ -200,7 +252,21 @@ void screenFileBrowserHandleTouch(int16_t x, int16_t y, bool pressed) {
 }
 
 void screenFileBrowserUpdate() {
-    // Nothing to update currently
+    // Check if USB mount state changed and refresh display
+    bool currentlyMounted = usbMscMounted();
+    if (currentlyMounted != usbLockedDisplayed) {
+        // State changed - redraw the file list area
+        if (currentlyMounted) {
+            usbLockedDisplayed = true;
+            drawUsbLockedOverlay();
+            Serial.println("USB mounted - file browser locked");
+        } else {
+            usbLockedDisplayed = false;
+            loadFileList();
+            drawFileListArea();
+            Serial.println("USB ejected - file browser unlocked");
+        }
+    }
 }
 
 void screenFileBrowserReset() {
@@ -208,4 +274,5 @@ void screenFileBrowserReset() {
     scrollOffset = 0;
     touchState = {false, -1, false};
     arrowButtonPressed = false;
+    usbLockedDisplayed = false;
 }

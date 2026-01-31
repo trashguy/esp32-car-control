@@ -1,10 +1,13 @@
 #include <Arduino.h>
 #include "slave/spi_slave.h"
+#include "slave/ota_handler.h"
 #include "display.h"
 #include "tasks.h"
 #include "sd_card.h"
+#include "usb_msc.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
+#include "shared/version.h"
 
 // =============================================================================
 // FreeRTOS Task-Based Architecture
@@ -38,6 +41,8 @@ void setup() {
 
     Serial.println("\n\n========================================");
     Serial.println("  ESP32-S3 SPI Display Slave (FreeRTOS)");
+    Serial.printf("  Version: %s\n", FIRMWARE_VERSION);
+    Serial.printf("  Built: %s\n", BUILD_TIMESTAMP);
     Serial.println("========================================\n");
 
     Serial.printf("CPU Freq: %d MHz\n", getCpuFrequencyMhz());
@@ -54,6 +59,15 @@ void setup() {
     if (!sdCardInit()) {
         Serial.println("SD card not available (continuing without it)");
     }
+#if PRODUCTION_BUILD
+    else {
+        // Initialize USB Mass Storage (disabled by default)
+        // Enable via Settings screen USB button to expose SD card to PC
+        if (!usbMscInit()) {
+            Serial.println("USB MSC initialization failed (continuing without it)");
+        }
+    }
+#endif
 
     // Initialize display (also initializes Wire for touch)
     if (!displayInit()) {
@@ -74,7 +88,11 @@ void setup() {
     }
 
     Serial.println("All tasks started. Slave ready.\n");
+#if PRODUCTION_BUILD
+    Serial.println("Commands: 'c' = stats, 't' = task info, 'e' = eject USB, '?' = help\n");
+#else
     Serial.println("Commands: 'c' = stats, 't' = task info, '?' = help\n");
+#endif
 }
 
 void loop() {

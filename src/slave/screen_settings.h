@@ -22,6 +22,11 @@
 #define SD_BTN_X        (SCREEN_WIDTH - SD_BTN_SIZE - 8)
 #define SD_BTN_Y        (SCREEN_HEIGHT - SD_BTN_SIZE - 8)
 
+// USB MSC toggle button (next to SD button)
+#define USB_BTN_SIZE    36
+#define USB_BTN_X       (SD_BTN_X - USB_BTN_SIZE - 8)
+#define USB_BTN_Y       (SCREEN_HEIGHT - USB_BTN_SIZE - 8)
+
 // WiFi button (bottom left)
 #define SETTINGS_WIFI_BTN_SIZE  36
 #define SETTINGS_WIFI_BTN_X     8

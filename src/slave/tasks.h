@@ -19,7 +19,7 @@
 // Stack sizes (in words, not bytes - multiply by 4 for bytes)
 #define TASK_STACK_SPI_COMM    4096
 #define TASK_STACK_DISPLAY     8192   // Display needs more for TFT operations
-#define TASK_STACK_SERIAL      2048
+#define TASK_STACK_SERIAL      4096   // Increased for OTA/SD operations
 
 // Core assignments (ESP32-S3 has 2 cores: 0 and 1)
 // Core 0: WiFi/BT stack runs here by default
