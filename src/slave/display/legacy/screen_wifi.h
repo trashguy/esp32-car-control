@@ -1,7 +1,7 @@
 #ifndef SCREEN_WIFI_H
 #define SCREEN_WIFI_H
 
-#include "display_common.h"
+#include "../display_common.h"
 
 // =============================================================================
 // WiFi Screen Layout Constants

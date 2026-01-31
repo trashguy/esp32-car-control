@@ -1,7 +1,7 @@
 #ifndef SCREEN_FILEBROWSER_H
 #define SCREEN_FILEBROWSER_H
 
-#include "display_common.h"
+#include "../display_common.h"
 
 // =============================================================================
 // File Browser Layout Constants

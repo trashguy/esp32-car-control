@@ -1,7 +1,8 @@
 #include "screen_main.h"
+#include "../display_common.h"
+#include "screen_ota_popup.h"
 #include "slave/spi_slave.h"
 #include "slave/ota_handler.h"
-#include "slave/ota_popup.h"
 #include "shared/config.h"
 #include "shared/protocol.h"
 #include <Arduino.h>

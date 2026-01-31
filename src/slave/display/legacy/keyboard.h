@@ -1,7 +1,7 @@
-#ifndef KEYBOARD_H
-#define KEYBOARD_H
+#ifndef LEGACY_KEYBOARD_H
+#define LEGACY_KEYBOARD_H
 
-#include "display_common.h"
+#include "../display_common.h"
 
 // =============================================================================
 // Keyboard Layout Constants
@@ -51,4 +51,4 @@ bool keyboardIsVisible();
 // Get the current target buffer (for external access if needed)
 char* keyboardGetTarget();
 
-#endif // KEYBOARD_H
+#endif // LEGACY_KEYBOARD_H

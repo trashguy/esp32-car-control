@@ -72,9 +72,14 @@ discover: $(OTA_PUSHER)  ## Discover devices on network
 # =============================================================================
 
 .PHONY: display
-display:  ## Build display (slave) firmware
-	@echo "$(CYAN)Building display firmware...$(RESET)"
+display:  ## Build display (slave) firmware (LVGL UI)
+	@echo "$(CYAN)Building display firmware (LVGL)...$(RESET)"
 	pio run -e slave
+
+.PHONY: display-legacy
+display-legacy:  ## Build display firmware with legacy TFT UI
+	@echo "$(CYAN)Building display firmware (legacy TFT)...$(RESET)"
+	pio run -e slave_legacy
 
 .PHONY: controller
 controller:  ## Build controller (master) firmware
@@ -99,8 +104,12 @@ $(OTA_PUSHER): $(OTA_DIR)/CMakeLists.txt $(wildcard $(OTA_DIR)/src/*.cpp) $(wild
 # =============================================================================
 
 .PHONY: flash-display
-flash-display:  ## Flash display firmware via USB
+flash-display:  ## Flash display firmware via USB (LVGL UI)
 	pio run -e slave -t upload
+
+.PHONY: flash-display-legacy
+flash-display-legacy:  ## Flash display firmware via USB (legacy TFT UI)
+	pio run -e slave_legacy -t upload
 
 .PHONY: flash-controller
 flash-controller:  ## Flash controller firmware via USB

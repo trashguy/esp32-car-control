@@ -1,5 +1,5 @@
 #include "display_common.h"
-#include "tasks.h"
+#include "../tasks.h"
 #include "shared/config.h"
 #include <Arduino.h>
 #include <Wire.h>

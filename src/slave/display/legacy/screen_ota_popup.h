@@ -1,7 +1,7 @@
-#ifndef OTA_POPUP_H
-#define OTA_POPUP_H
+#ifndef SCREEN_OTA_POPUP_H
+#define SCREEN_OTA_POPUP_H
 
-#include "../../src/slave/display_common.h"
+#include "../display_common.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -71,4 +71,4 @@ void otaPopupSetError(const char* message);
 // Set complete state
 void otaPopupSetComplete();
 
-#endif // OTA_POPUP_H
+#endif // SCREEN_OTA_POPUP_H

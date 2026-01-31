@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.0] - 2026-01-31
+
+LVGL UI system with legacy TFT fallback and display code reorganization.
+
+### Added
+- **LVGL 9.x UI System** - Modern graphics library for touchscreen interface:
+  - New LVGL-based screens: main, settings, filebrowser, wifi, OTA popup
+  - LVGL driver (`lvgl_driver.cpp/h`) for TFT_eSPI integration
+  - Theme system (`ui_theme.cpp/h`) with consistent styling
+  - Reusable keyboard wrapper (`ui_keyboard.cpp/h`)
+- **Build Configuration Split** - Separate environments for UI systems:
+  - `slave` / `slave_prod` - LVGL UI (40.6% flash, 54.4% RAM)
+  - `slave_legacy` / `slave_legacy_prod` - Legacy TFT UI (28.1% flash, 15.8% RAM)
+  - `USE_LVGL_UI` build flag for conditional compilation
+- **Makefile Targets** - Legacy build support:
+  - `make display-legacy` - Build legacy TFT firmware
+  - `make flash-display-legacy` - Flash legacy firmware via USB
+
+### Changed
+- **Display Code Reorganization** - Restructured `src/slave/display/`:
+  - `legacy/` - TFT_eSPI direct-drawing screens and keyboard
+  - `lvgl/` - LVGL-based screens, theme, and keyboard wrapper
+  - Shared modules remain in parent directory
+- **OTA Popup** - Moved to respective UI directories with conditional compilation
+
+### Technical
+- Added `exclude_arm_asm.py` - Build script to disable ARM assembly in LVGL
+- Updated `lv_conf.h` - LVGL configuration for ESP32-S3
+
 ## [1.0.0] - 2026-01-31
 
 First production-ready release with OTA firmware update capability.

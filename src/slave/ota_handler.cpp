@@ -1,7 +1,6 @@
 #include "slave/ota_handler.h"
 #include "slave/spi_ota.h"
-#include "slave/ota_popup.h"
-#include "display_common.h"
+#include "display/display_common.h"
 #include "sd_card.h"
 #include <Arduino.h>
 #include <WiFi.h>
@@ -13,6 +12,15 @@
 #include <Update.h>
 #include <ArduinoJson.h>
 #include <MD5Builder.h>
+
+// OTA popup - conditionally include based on UI system
+#if USE_LVGL_UI
+#include "display/lvgl/ui_ota_popup.h"
+// Map legacy function names to LVGL equivalents
+#define otaPopupSetProgress(p) ui_ota_popup_set_progress(p)
+#else
+#include "display/legacy/screen_ota_popup.h"
+#endif
 
 // =============================================================================
 // Local State

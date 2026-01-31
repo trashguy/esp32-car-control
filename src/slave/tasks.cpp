@@ -1,7 +1,7 @@
 #include "tasks.h"
 #include "slave/spi_slave.h"
 #include "slave/ota_handler.h"
-#include "display.h"
+#include "display/display.h"
 #include "usb_msc.h"
 #include "shared/config.h"
 #include "shared/protocol.h"

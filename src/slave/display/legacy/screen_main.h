@@ -1,7 +1,7 @@
 #ifndef SCREEN_MAIN_H
 #define SCREEN_MAIN_H
 
-#include "display_common.h"
+#include "../display_common.h"
 
 // =============================================================================
 // Main Screen Layout Constants

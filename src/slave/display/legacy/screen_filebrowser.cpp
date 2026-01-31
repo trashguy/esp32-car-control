@@ -1,6 +1,7 @@
 #include "screen_filebrowser.h"
-#include "sd_card.h"
-#include "usb_msc.h"
+#include "../display_common.h"
+#include "../../sd_card.h"
+#include "../../usb_msc.h"
 #include <Arduino.h>
 #include <SD_MMC.h>
 

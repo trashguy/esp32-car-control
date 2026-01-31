@@ -1,7 +1,7 @@
 #ifndef SCREEN_SETTINGS_H
 #define SCREEN_SETTINGS_H
 
-#include "display_common.h"
+#include "../display_common.h"
 
 // =============================================================================
 // Settings Screen Layout Constants

@@ -12,6 +12,7 @@
 
 # Claude/AI assistants
 .claude/
+.opencode/
 
 # Python
 __pycache__/

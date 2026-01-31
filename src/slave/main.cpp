@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "slave/spi_slave.h"
 #include "slave/ota_handler.h"
-#include "display.h"
+#include "display/display.h"
 #include "tasks.h"
 #include "sd_card.h"
 #include "usb_msc.h"

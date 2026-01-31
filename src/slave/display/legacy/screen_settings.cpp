@@ -1,6 +1,7 @@
 #include "screen_settings.h"
-#include "sd_card.h"
-#include "usb_msc.h"
+#include "../display_common.h"
+#include "../../sd_card.h"
+#include "../../usb_msc.h"
 #include "shared/version.h"
 #include <Arduino.h>
 #include <WiFi.h>

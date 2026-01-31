@@ -1,4 +1,5 @@
 #include "screen_wifi.h"
+#include "../display_common.h"
 #include "keyboard.h"
 #include <Arduino.h>
 #include <WiFi.h>

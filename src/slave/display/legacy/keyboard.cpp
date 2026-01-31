@@ -1,4 +1,5 @@
 #include "keyboard.h"
+#include "../display_common.h"
 #include <Arduino.h>
 #include <ctype.h>
 #include <string.h>

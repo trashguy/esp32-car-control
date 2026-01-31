@@ -1,8 +1,8 @@
-#include "slave/ota_popup.h"
+#include "screen_ota_popup.h"
 #include "slave/ota_handler.h"
 #include "slave/spi_ota.h"
 #include "shared/ota_protocol.h"
-#include "display_common.h"
+#include "../display_common.h"
 #include <Arduino.h>
 
 // =============================================================================
